@@ -8,11 +8,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArrowLeft } from 'lucide-react';
 import { formatRupiah, generateSeats } from '@/data/dummy';
 import { toast } from 'sonner';
+import { PaymentModal } from '@/components/PaymentModal';
+import { PaymentMethod } from '@/types/shuttle';
 
 const CustomerBookingNew = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { routes, routePoints, schedules, vehicles, bookings, addBooking, currentUser } = useShuttle();
+  const { routes, routePoints, schedules, vehicles, bookings, addBooking, setBookings, currentUser } = useShuttle();
 
   const scheduleId = searchParams.get('scheduleId') || '';
   const routeId = searchParams.get('routeId') || '';
@@ -24,6 +26,15 @@ const CustomerBookingNew = () => {
 
   const [selectedSeat, setSelectedSeat] = useState<number | null>(null);
   const [selectedPickup, setSelectedPickup] = useState('');
+  const [showPayment, setShowPayment] = useState(false);
+  const [lastBookingId, setLastBookingId] = useState('');
+
+  const handlePaymentConfirm = (method: PaymentMethod) => {
+    setBookings(prev => prev.map(b => b.id === lastBookingId ? { ...b, paymentStatus: 'paid' as const, paymentMethod: method } : b));
+    setShowPayment(false);
+    toast.success('Booking & pembayaran berhasil!');
+    navigate(`/customer/booking/${lastBookingId}`);
+  };
 
   if (!schedule || !route || !vehicle) return <div className="p-4">Data tidak ditemukan</div>;
 
@@ -51,10 +62,12 @@ const CustomerBookingNew = () => {
       status: 'confirmed' as const,
       bookingDate: new Date().toISOString().split('T')[0],
       departureTime: schedule.departureTime,
+      paymentStatus: 'pending' as const,
+      paymentMethod: null,
     };
     addBooking(newBooking);
-    toast.success('Booking berhasil!');
-    navigate(`/customer/booking/${newBooking.id}`);
+    setLastBookingId(newBooking.id);
+    setShowPayment(true);
   };
 
   return (
@@ -145,6 +158,13 @@ const CustomerBookingNew = () => {
           </Button>
         </CardContent>
       </Card>
+
+      <PaymentModal
+        open={showPayment}
+        onClose={() => setShowPayment(false)}
+        amount={route.price}
+        onConfirm={handlePaymentConfirm}
+      />
     </div>
   );
 };

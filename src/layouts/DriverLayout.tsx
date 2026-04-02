@@ -1,6 +1,7 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, List, LogOut } from 'lucide-react';
+import { LayoutDashboard, List, LogOut, Navigation } from 'lucide-react';
 import { useShuttle } from '@/contexts/ShuttleContext';
+import { NotificationCenter } from '@/components/NotificationCenter';
 
 const DriverLayout = () => {
   const navigate = useNavigate();
@@ -10,6 +11,7 @@ const DriverLayout = () => {
   const tabs = [
     { path: '/driver', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/driver/trips', icon: List, label: 'Perjalanan' },
+    { path: '/driver/tracking', icon: Navigation, label: 'GPS' },
   ];
 
   const isActive = (path: string) => location.pathname === path;
@@ -21,9 +23,12 @@ const DriverLayout = () => {
           <h1 className="text-lg font-bold">🚐 Driver Panel</h1>
           <p className="text-xs opacity-80">{currentUser?.name}</p>
         </div>
-        <button onClick={() => { logout(); navigate('/'); }} className="p-2 rounded-lg hover:bg-primary/80">
-          <LogOut className="h-5 w-5" />
-        </button>
+        <div className="flex items-center gap-1">
+          <NotificationCenter role="driver" variant="light" />
+          <button onClick={() => { logout(); navigate('/'); }} className="p-2 rounded-lg hover:bg-primary/80">
+            <LogOut className="h-5 w-5" />
+          </button>
+        </div>
       </header>
 
       <main className="flex-1 overflow-y-auto pb-20">
