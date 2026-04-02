@@ -24,6 +24,9 @@ import DriverLayout from "./layouts/DriverLayout";
 import DriverDashboard from "./pages/driver/DriverDashboard";
 import DriverTripDetail from "./pages/driver/DriverTripDetail";
 import DriverTrips from "./pages/driver/DriverTrips";
+import DriverWallet from "./pages/driver/DriverWallet";
+import DriverTopUp from "./pages/driver/DriverTopUp";
+import DriverWithdraw from "./pages/driver/DriverWithdraw";
 import DriverTracking from "./pages/driver/DriverTracking";
 
 import AdminLogin from "./pages/admin/AdminLogin";
@@ -50,7 +53,12 @@ const App = () => (
         <NotificationProvider>
           <Toaster />
           <Sonner />
-          <BrowserRouter>
+          <BrowserRouter
+            future={{
+              v7_startTransition: true,
+              v7_relativeSplatPath: true,
+            }}
+          >
             <Routes>
               <Route path="/" element={<Index />} />
 
@@ -72,6 +80,9 @@ const App = () => (
                 <Route index element={<DriverDashboard />} />
                 <Route path="trips" element={<DriverTrips />} />
                 <Route path="trip/:scheduleId" element={<DriverTripDetail />} />
+                <Route path="wallet" element={<DriverWallet />} />
+                <Route path="wallet/top-up" element={<DriverTopUp />} />
+                <Route path="wallet/withdraw" element={<DriverWithdraw />} />
                 <Route path="tracking" element={<DriverTracking />} />
               </Route>
 

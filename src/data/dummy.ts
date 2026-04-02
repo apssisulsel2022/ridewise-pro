@@ -1,4 +1,4 @@
-import { Route, RoutePoint, Schedule, Driver, Vehicle, Booking } from '@/types/shuttle';
+import { Route, RoutePoint, Schedule, Driver, Vehicle, Booking, Wallet, Transaction } from '@/types/shuttle';
 
 export const dummyRoutes: Route[] = [
   { id: 'r1', name: 'Hermes → Kualanamu', rayon: 'A', origin: 'Hermes', destination: 'Kualanamu', distanceMeters: 38000, pricePerMeter: 2, price: 76000 },
@@ -96,3 +96,20 @@ export const generateSeats = (vehicleId: string): { seatNumber: number; row: num
 export const formatRupiah = (amount: number): string => {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
 };
+
+export const dummyWallets: Wallet[] = [
+  { driverId: 'd1', balance: 1500000 },
+  { driverId: 'd2', balance: 850000 },
+  { driverId: 'd3', balance: 2300000 },
+  { driverId: 'd4', balance: 50000 },
+  { driverId: 'd5', balance: 1200000 },
+];
+
+export const dummyTransactions: Transaction[] = [
+  { id: 't1', driverId: 'd1', amount: 500000, type: 'top-up', status: 'completed', date: '2026-03-28' },
+  { id: 't2', driverId: 'd1', amount: 76000, type: 'commission', status: 'completed', date: '2026-03-29' },
+  { id: 't3', driverId: 'd2', amount: 300000, type: 'top-up', status: 'completed', date: '2026-03-30' },
+  { id: 't4', driverId: 'd1', amount: 150000, type: 'payout', status: 'completed', date: '2026-03-31' },
+  { id: 't5', driverId: 'd3', amount: 1000000, type: 'top-up', status: 'completed', date: '2026-04-01' },
+  { id: 't6', driverId: 'd2', amount: 262500, type: 'commission', status: 'completed', date: '2026-04-02' },
+];

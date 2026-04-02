@@ -65,7 +65,7 @@ export interface Seat {
   isAvailable: boolean;
 }
 
-export type PaymentMethod = 'bank_transfer' | 'ewallet' | 'qris';
+export type PaymentMethod = 'qris' | 'bank_transfer' | 'credit_card';
 export type PaymentStatus = 'pending' | 'paid' | 'expired' | 'failed';
 
 export interface Booking {
@@ -119,4 +119,21 @@ export interface PaymentConfig {
   clientKey: string;
   environment: 'sandbox' | 'production';
   enabled: boolean;
+}
+
+export interface Wallet {
+  driverId: string;
+  balance: number;
+}
+
+export interface Transaction {
+  id: string;
+  driverId: string;
+  amount: number;
+  type: 'top-up' | 'payout' | 'fee' | 'commission' | 'withdrawal';
+  status: 'completed' | 'pending' | 'failed';
+  date: string;
+  bankName?: string;
+  accountNumber?: string;
+  reference?: string;
 }

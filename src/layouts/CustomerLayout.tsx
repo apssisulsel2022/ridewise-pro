@@ -1,4 +1,5 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 import { Home, Clock, Ticket, User, LogOut } from 'lucide-react';
 import { useShuttle } from '@/contexts/ShuttleContext';
 import { NotificationCenter } from '@/components/NotificationCenter';
@@ -6,7 +7,17 @@ import { NotificationCenter } from '@/components/NotificationCenter';
 const CustomerLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { logout } = useShuttle();
+  const { logout, currentUser } = useShuttle();
+
+  useEffect(() => {
+    if (!currentUser || currentUser.role !== 'customer') {
+      navigate('/customer/login');
+    }
+  }, [currentUser, navigate]);
+
+  if (!currentUser || currentUser.role !== 'customer') {
+    return null;
+  }
 
   const tabs = [
     { path: '/customer', icon: Home, label: 'Beranda' },

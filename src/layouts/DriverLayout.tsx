@@ -1,5 +1,6 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, List, LogOut, Navigation } from 'lucide-react';
+import { useEffect } from 'react';
+import { LayoutDashboard, List, LogOut, Navigation, Wallet } from 'lucide-react';
 import { useShuttle } from '@/contexts/ShuttleContext';
 import { NotificationCenter } from '@/components/NotificationCenter';
 
@@ -8,9 +9,20 @@ const DriverLayout = () => {
   const location = useLocation();
   const { logout, currentUser } = useShuttle();
 
+  useEffect(() => {
+    if (!currentUser || currentUser.role !== 'driver') {
+      navigate('/driver/login');
+    }
+  }, [currentUser, navigate]);
+
+  if (!currentUser || currentUser.role !== 'driver') {
+    return null;
+  }
+
   const tabs = [
     { path: '/driver', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/driver/trips', icon: List, label: 'Perjalanan' },
+    { path: '/driver/wallet', icon: Wallet, label: 'Wallet' },
     { path: '/driver/tracking', icon: Navigation, label: 'GPS' },
   ];
 

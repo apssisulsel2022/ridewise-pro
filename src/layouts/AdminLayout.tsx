@@ -1,4 +1,5 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 import { LayoutDashboard, MapPin, Navigation, CalendarDays, Users, Bus, Link2, BookOpen, FileText, LogOut, Map, BarChart3, CreditCard } from 'lucide-react';
 import { useShuttle } from '@/contexts/ShuttleContext';
 import { NotificationCenter } from '@/components/NotificationCenter';
@@ -49,6 +50,16 @@ const AdminSidebar = () => {
 const AdminLayout = () => {
   const navigate = useNavigate();
   const { logout, currentUser } = useShuttle();
+
+  useEffect(() => {
+    if (!currentUser || currentUser.role !== 'admin') {
+      navigate('/admin/login');
+    }
+  }, [currentUser, navigate]);
+
+  if (!currentUser || currentUser.role !== 'admin') {
+    return null;
+  }
 
   return (
     <SidebarProvider>
