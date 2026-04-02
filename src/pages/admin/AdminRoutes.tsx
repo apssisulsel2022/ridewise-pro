@@ -29,8 +29,7 @@ const AdminRoutes = () => {
     rayon: 'A' as Route['rayon'], 
     origin: '', 
     destination: '', 
-    distanceMeters: 0, 
-    pricePerMeter: 1500 
+    distanceMeters: 0
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -41,7 +40,6 @@ const AdminRoutes = () => {
     if (!form.origin.trim()) newErrors.origin = 'Titik asal harus diisi';
     if (!form.destination.trim()) newErrors.destination = 'Titik tujuan harus diisi';
     if (form.distanceMeters <= 0) newErrors.distanceMeters = 'Jarak harus lebih dari 0';
-    if (form.pricePerMeter <= 0) newErrors.pricePerMeter = 'Tarif harus lebih dari 0';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -73,14 +71,14 @@ const AdminRoutes = () => {
 
   const openNew = () => { 
     setEditing(null); 
-    setForm({ name: '', rayon: 'A', origin: '', destination: '', distanceMeters: 0, pricePerMeter: 1500 }); 
+    setForm({ name: '', rayon: 'A', origin: '', destination: '', distanceMeters: 0 }); 
     setErrors({});
     setOpen(true); 
   };
 
   const openEdit = (r: Route) => { 
     setEditing(r); 
-    setForm({ name: r.name, rayon: r.rayon, origin: r.origin, destination: r.destination, distanceMeters: r.distanceMeters, pricePerMeter: r.pricePerMeter }); 
+    setForm({ name: r.name, rayon: r.rayon, origin: r.origin, destination: r.destination, distanceMeters: r.distanceMeters }); 
     setErrors({});
     setOpen(true); 
   };
@@ -92,15 +90,14 @@ const AdminRoutes = () => {
     }
 
     setIsSubmitting(true);
-    const price = form.distanceMeters * form.pricePerMeter;
     
     // Simulate network delay
     setTimeout(() => {
       if (editing) {
-        setRoutes(prev => prev.map(r => r.id === editing.id ? { ...r, ...form, price } : r));
+        setRoutes(prev => prev.map(r => r.id === editing.id ? { ...r, ...form } : r));
         toast.success('Rute diperbarui');
       } else {
-        const newRoute: Route = { id: `r${Date.now()}`, ...form, price };
+        const newRoute: Route = { id: `r${Date.now()}`, ...form };
         setRoutes(prev => [...prev, newRoute]);
         setSelectedRouteForMap(newRoute);
         toast.success('Rute ditambahkan. Sekarang tentukan titik rute pada peta.');
@@ -120,7 +117,7 @@ const AdminRoutes = () => {
     if (selectedRouteForMap) {
       updateRoutePoints(selectedRouteForMap.id, points);
       // Update distance in the route itself
-      setRoutes(prev => prev.map(r => r.id === selectedRouteForMap.id ? { ...r, distanceMeters: distance, price: distance * r.pricePerMeter } : r));
+      setRoutes(prev => prev.map(r => r.id === selectedRouteForMap.id ? { ...r, distanceMeters: distance } : r));
     }
   };
 
@@ -216,7 +213,7 @@ const AdminRoutes = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   <div className="grid gap-2">
                     <Label className={cn("font-semibold", errors.distanceMeters && "text-destructive")}>Estimasi Jarak (m)</Label>
                     <Input 
@@ -227,32 +224,10 @@ const AdminRoutes = () => {
                     />
                     {errors.distanceMeters && <p className="text-[10px] font-bold text-destructive uppercase">{errors.distanceMeters}</p>}
                   </div>
-                  <div className="grid gap-2">
-                    <Label className={cn("font-semibold", errors.pricePerMeter && "text-destructive")}>Tarif/Meter (Rp)</Label>
-                    <Input 
-                      type="number" 
-                      value={form.pricePerMeter} 
-                      onChange={e => setForm({...form, pricePerMeter: Number(e.target.value)})}
-                      className={cn("h-11", errors.pricePerMeter && "border-destructive")}
-                    />
-                    {errors.pricePerMeter && <p className="text-[10px] font-bold text-destructive uppercase">{errors.pricePerMeter}</p>}
-                  </div>
                 </div>
               </div>
 
-              <div className="flex flex-col justify-between gap-4">
-                <Card className="bg-primary text-primary-foreground border-none shadow-lg overflow-hidden relative group">
-                  <div className="absolute top-0 right-0 p-1 opacity-20 group-hover:scale-110 transition-transform duration-500">
-                    <TrendingUp className="h-16 w-16" />
-                  </div>
-                  <CardContent className="p-5 flex justify-between items-center relative z-10 h-full">
-                    <div>
-                      <p className="text-[10px] text-white/70 uppercase font-black tracking-widest">Estimasi Total Tarif</p>
-                      <p className="text-3xl font-black tabular-nums">{formatRupiah(form.distanceMeters * form.pricePerMeter)}</p>
-                    </div>
-                    <Badge variant="outline" className="border-white/30 text-white bg-white/10 text-[10px] font-black tracking-tighter">Dynamic Price</Badge>
-                  </CardContent>
-                </Card>
+              <div className="flex flex-col justify-end gap-4">
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={() => setOpen(false)} className="flex-1 font-bold h-12">Batal</Button>
                   <Button onClick={handleSave} disabled={isSubmitting} className="flex-1 font-bold h-12 shadow-lg hover:shadow-primary/20">
@@ -308,11 +283,6 @@ const AdminRoutes = () => {
                           Jarak <SortIcon column="distanceMeters" />
                         </div>
                       </TableHead>
-                      <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('price')}>
-                        <div className="flex items-center font-bold uppercase text-[11px] tracking-widest">
-                          Tarif <SortIcon column="price" />
-                        </div>
-                      </TableHead>
                       <TableHead className="text-right font-bold uppercase text-[11px] tracking-widest">Aksi</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -355,14 +325,8 @@ const AdminRoutes = () => {
                             RAYON {r.rayon}
                           </Badge>
                         </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col">
-                            <span className="text-sm font-bold tracking-tighter">{(r.distanceMeters/1000).toFixed(1)} km</span>
-                            <span className="text-[10px] text-muted-foreground tabular-nums">{r.distanceMeters.toLocaleString()} meter</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm font-black text-primary tracking-tight">{formatRupiah(r.price)}</span>
+                        <TableCell className="font-mono text-xs text-muted-foreground">
+                          {(r.distanceMeters / 1000).toFixed(1)} km
                         </TableCell>
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -378,7 +342,7 @@ const AdminRoutes = () => {
                     ))}
                     {filteredRoutes.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={5} className="py-20">
+                        <TableCell colSpan={4} className="py-20">
                           <div className="flex flex-col items-center justify-center text-center space-y-4 animate-in fade-in zoom-in duration-300">
                             <div className="p-4 bg-muted/50 rounded-full">
                               <PackageOpen className="h-12 w-12 text-muted-foreground/40" />

@@ -1,4 +1,15 @@
-export type UserRole = 'customer' | 'driver' | 'admin';
+export type UserRole = 'customer' | 'driver' | 'admin' | 'superadmin';
+
+export type Permission = 
+  | 'manage_admins'
+  | 'manage_business'
+  | 'manage_system'
+  | 'view_analytics'
+  | 'manage_finance'
+  | 'manage_users'
+  | 'manage_drivers'
+  | 'manage_vehicles'
+  | 'manage_routes';
 
 export interface User {
   id: string;
@@ -6,6 +17,13 @@ export interface User {
   email: string;
   phone: string;
   role: UserRole;
+  permissions?: Permission[];
+  status?: 'active' | 'suspended' | 'blocked';
+  deactivationReason?: string;
+}
+
+export interface AdminUser extends User {
+  role: 'admin' | 'superadmin';
 }
 
 export interface Driver {
@@ -13,8 +31,12 @@ export interface Driver {
   name: string;
   email: string;
   phone: string;
-  licenseNumber: string;
-  status: 'active' | 'inactive';
+  status: 'active' | 'offline' | 'suspended';
+  rating: number;
+  totalTrips: number;
+  walletBalance: number;
+  suspensionEnd?: string;
+  suspensionReason?: string;
 }
 
 export interface Vehicle {
@@ -24,6 +46,9 @@ export interface Vehicle {
   capacity: number;
   type: string;
   status: 'active' | 'maintenance' | 'inactive';
+  imageUrl?: string;
+  stnkUrl?: string;
+  nextMaintenanceDate?: string;
 }
 
 export interface Route {
@@ -33,8 +58,6 @@ export interface Route {
   origin: string;
   destination: string;
   distanceMeters: number;
-  pricePerMeter: number;
-  price: number;
 }
 
 export interface RoutePoint {
@@ -48,6 +71,7 @@ export interface RoutePoint {
   address?: string;
   notes?: string;
   imageUrl?: string;
+  price: number;
 }
 
 export interface Schedule {
@@ -137,6 +161,8 @@ export interface AuditLog {
   details: string;
   timestamp: string;
   ipAddress?: string;
+  oldValue?: string;
+  newValue?: string;
 }
 
 export interface FavoriteLocation {
@@ -156,7 +182,19 @@ export interface PickupHistory {
   timestamp: string;
 }
 
-export interface SystemConfig {
+export interface BusinessConfig {
+  platformFeePercentage: number;
+  driverCommissionPercentage: number;
+  basePricePerKm: number;
+  currency: string;
+  history: {
+    timestamp: string;
+    updatedBy: string;
+    changes: string;
+  }[];
+}
+
+export interface SystemConfig extends BusinessConfig {
   minWithdrawal: number;
   maxWithdrawal: number;
   serviceFee: number;
@@ -165,14 +203,15 @@ export interface SystemConfig {
 
 export interface Transaction {
   id: string;
-  driverId: string;
+  bookingId?: string;
+  userId: string;
+  userName: string;
   amount: number;
-  type: 'top-up' | 'payout' | 'fee' | 'commission' | 'withdrawal';
-  status: 'completed' | 'pending' | 'failed';
-  date: string;
-  bankName?: string;
-  accountNumber?: string;
-  reference?: string;
+  type: 'topup' | 'payment' | 'withdraw' | 'refund';
+  method: PaymentMethod;
+  platformFee: number;
+  status: 'pending' | 'success' | 'failed';
+  timestamp: string;
 }
 
 export type MapLayerType = 'osm' | 'satellite' | 'terrain' | 'dark';

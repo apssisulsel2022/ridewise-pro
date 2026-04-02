@@ -31,8 +31,10 @@ const AdminPoints = () => {
     address: '', 
     lat: -6.2088, 
     lng: 106.8456, 
-    notes: '' 
+    notes: '',
+    price: 0
   });
+
   const [filterRoute, setFilterRoute] = useState('all');
   
   const [selectedPoint, setSelectedPoint] = useState<RoutePoint | null>(null);
@@ -68,7 +70,8 @@ const AdminPoints = () => {
         address: '', 
         lat: -6.2088, 
         lng: 106.8456, 
-        notes: '' 
+        notes: '',
+        price: 0
       });
     } catch (error) {
       toast.error('Gagal menambahkan titik jemput');
@@ -156,6 +159,12 @@ const AdminPoints = () => {
                 <Input placeholder="Catatan untuk driver/penumpang" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
               </div>
 
+              <div className="space-y-2">
+                <Label className="text-primary font-bold">Harga Tiket (Rp)</Label>
+                <Input type="number" placeholder="Contoh: 75000" value={form.price} onChange={e => setForm({...form, price: Number(e.target.value)})} className="border-primary/50 focus:ring-primary" />
+                <p className="text-[10px] text-muted-foreground italic">* Harga ini akan berlaku saat penumpang memilih titik ini sebagai penjemputan.</p>
+              </div>
+
               <Button className="w-full" onClick={handleSave} disabled={saving}>
                 {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Simpan Titik Jemput
@@ -184,6 +193,7 @@ const AdminPoints = () => {
                 <TableHead>Nama Lokasi</TableHead>
                 <TableHead>Rute</TableHead>
                 <TableHead className="text-center">Urutan</TableHead>
+                <TableHead className="text-right">Harga</TableHead>
                 <TableHead className="text-right">Aksi</TableHead>
               </TableRow>
             </TableHeader>
@@ -212,6 +222,13 @@ const AdminPoints = () => {
                       {routes.find(r => r.id === p.routeId)?.name || 'N/A'}
                     </TableCell>
                     <TableCell className="text-center font-medium">{p.order}</TableCell>
+                    <TableCell className="text-right font-bold text-primary">
+                      {p.price > 0 ? (
+                        new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(p.price)
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] text-muted-foreground bg-slate-50 border-slate-200">FREE / DEST</Badge>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         <Button variant="ghost" size="icon" onClick={() => openDetail(p)} title="Lihat Detail">

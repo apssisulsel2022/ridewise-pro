@@ -17,7 +17,7 @@ interface RouteEditorMapProps {
 }
 
 const RouteEditorMap = ({ route, onPointsChange }: RouteEditorMapProps) => {
-  const { routePoints, mapLayer, schedules, drivers, vehicles } = useShuttle();
+  const { routePoints, mapLayer, schedules, drivers, vehicles, systemConfig } = useShuttle();
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
@@ -28,6 +28,24 @@ const RouteEditorMap = ({ route, onPointsChange }: RouteEditorMapProps) => {
 
   const [localPoints, setLocalPoints] = useState<RoutePoint[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Helper to calculate price based on distance to the end of the route
+  const calculatePriceForPoint = useCallback((idx: number, allPoints: { lat: number; lng: number }[]) => {
+    if (idx >= allPoints.length - 1) return 0;
+    
+    // Distance from current point to the last point (destination)
+    let distanceToDestination = 0;
+    for (let i = idx; i < allPoints.length - 1; i++) {
+      distanceToDestination += calculateDistanceBetweenPoints(
+        allPoints[i].lat,
+        allPoints[i].lng,
+        allPoints[i + 1].lat,
+        allPoints[i + 1].lng
+      );
+    }
+    
+    return Math.round((distanceToDestination / 1000) * systemConfig.basePricePerKm);
+  }, [systemConfig.basePricePerKm]);
 
   // Set isMounted to true on mount and false on unmount
   useEffect(() => {
@@ -83,7 +101,8 @@ const RouteEditorMap = ({ route, onPointsChange }: RouteEditorMapProps) => {
             name: `Titik ${prev.length + 1}`,
             order: prev.length + 1,
             lat,
-            lng
+            lng,
+            price: 0 // Will be calculated when saved or manually updated
           };
           return [...prev, newPoint];
         });
@@ -114,7 +133,7 @@ const RouteEditorMap = ({ route, onPointsChange }: RouteEditorMapProps) => {
         toast.error('Gagal menginisialisasi peta');
       }
     }
-  }, [route]); // Re-init only when route base context changes significantly
+  }, [route, calculatePriceForPoint]); // Re-init only when route base context changes significantly
 
   // Optimized Tile Layer switching
   useEffect(() => {
@@ -208,11 +227,18 @@ const RouteEditorMap = ({ route, onPointsChange }: RouteEditorMapProps) => {
   const handleSavePoints = () => {
     if (!route) return;
     setIsSaving(true);
+    
+    // Auto-calculate prices for points that don't have one (optional business logic)
+    const pointsWithPrices = localPoints.map((p, idx) => ({
+      ...p,
+      price: p.price || calculatePriceForPoint(idx, localPoints)
+    }));
+
     // Simulate API delay
     setTimeout(() => {
       if (!isMounted.current) return;
       
-      onPointsChange?.(localPoints, currentTotalDistance);
+      onPointsChange?.(pointsWithPrices, currentTotalDistance);
       setIsSaving(false);
       toast.success(`Rute berhasil disimpan. Total jarak: ${(currentTotalDistance/1000).toFixed(2)} km`);
     }, 800);

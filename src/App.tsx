@@ -47,6 +47,11 @@ import AdminTracking from "./pages/admin/AdminTracking";
 import AdminAnalytics from "./pages/admin/AdminAnalytics";
 import AdminPaymentSettings from "./pages/admin/AdminPaymentSettings";
 
+import SuperAdminDashboard from "./pages/superadmin/SuperAdminDashboard";
+import BusinessConfig from "./pages/superadmin/BusinessConfig";
+import AdminManagement from "./pages/superadmin/AdminManagement";
+import GlobalMonitoring from "./pages/superadmin/GlobalMonitoring";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -107,6 +112,22 @@ const App = () => (
                 <Route path="tracking" element={<AdminTracking />} />
                 <Route path="analytics" element={<AdminAnalytics />} />
                 <Route path="payment-settings" element={<AdminPaymentSettings />} />
+              </Route>
+
+              {/* Super Admin */}
+              <Route path="/superadmin" element={<AdminLayout />}>
+                <Route index element={<SuperAdminDashboard />} />
+                <Route path="admins" element={<AdminManagement />} />
+                <Route path="business-config" element={<BusinessConfig />} />
+                <Route path="monitoring" element={<GlobalMonitoring />} />
+                <Route path="routes" element={<AdminRoutes />} />
+                <Route path="schedules" element={<AdminSchedules />} />
+                <Route path="drivers" element={<AdminDrivers />} />
+                <Route path="users" element={<AdminUsers />} />
+                <Route path="vehicles" element={<AdminVehicles />} />
+                <Route path="bookings" element={<AdminBookings />} />
+                <Route path="audit" element={<AdminAudit />} />
+                <Route path="analytics" element={<AdminAnalytics />} />
               </Route>
 
               <Route path="*" element={<NotFound />} />

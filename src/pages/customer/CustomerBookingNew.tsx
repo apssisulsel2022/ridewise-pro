@@ -31,6 +31,9 @@ const CustomerBookingNew = () => {
   const [showPayment, setShowPayment] = useState(false);
   const [lastBookingId, setLastBookingId] = useState('');
 
+  const selectedPoint = points.find(p => p.id === selectedPickup);
+  const currentPrice = selectedPoint?.price || 0;
+
   const handlePaymentConfirm = (method: PaymentMethod) => {
     setBookings(prev => prev.map(b => b.id === lastBookingId ? { ...b, paymentStatus: 'paid' as const, paymentMethod: method } : b));
     setShowPayment(false);
@@ -64,7 +67,7 @@ const CustomerBookingNew = () => {
       pickupPointId: selectedPickup,
       pickupPointName: pickup?.name || '',
       seatNumber: selectedSeat,
-      price: route.price,
+      price: currentPrice,
       status: 'confirmed' as const,
       bookingDate: new Date().toISOString().split('T')[0],
       departureTime: schedule.departureTime,
@@ -211,9 +214,13 @@ const CustomerBookingNew = () => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between gap-4">
               <div className="space-y-0.5">
-                <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Estimasi Pembayaran</p>
+                <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+                  {selectedPickup ? 'Total Pembayaran' : 'Estimasi Harga'}
+                </p>
                 <div className="flex items-baseline gap-1">
-                  <p className="text-2xl font-black text-primary">{formatRupiah(route.price)}</p>
+                  <p className="text-2xl font-black text-primary">
+                    {formatRupiah(currentPrice > 0 ? currentPrice : 0)}
+                  </p>
                   <p className="text-[10px] text-muted-foreground font-medium">/ pax</p>
                 </div>
               </div>
@@ -233,7 +240,7 @@ const CustomerBookingNew = () => {
       <PaymentModal
         open={showPayment}
         onClose={() => setShowPayment(false)}
-        amount={route.price}
+        amount={currentPrice}
         onConfirm={handlePaymentConfirm}
       />
     </div>

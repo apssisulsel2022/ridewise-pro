@@ -50,12 +50,33 @@ export const ShuttleProvider = ({ children }: { children: ReactNode }) => {
   const [routes, setRoutes] = useState<Route[]>(dummyRoutes);
   const [routePoints, setRoutePoints] = useState<RoutePoint[]>(dummyRoutePoints);
   const [schedules, setSchedules] = useState<Schedule[]>(dummySchedules);
-  const [drivers, setDrivers] = useState<Driver[]>(dummyDrivers);
+  const [drivers, setDrivers] = useState<Driver[]>(dummyDrivers.map(d => ({
+    ...d,
+    status: 'active' as const,
+    rating: 4.8,
+    totalTrips: Math.floor(Math.random() * 100),
+    walletBalance: Math.floor(Math.random() * 1000000),
+  })));
   const [customers, setCustomers] = useState<User[]>(dummyCustomers);
-  const [vehicles, setVehicles] = useState<Vehicle[]>(dummyVehicles);
+  const [vehicles, setVehicles] = useState<Vehicle[]>(dummyVehicles.map(v => ({
+    ...v,
+    status: 'active' as const,
+    imageUrl: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?q=80&w=2069&auto=format&fit=crop',
+    stnkUrl: 'https://example.com/stnk.pdf',
+    nextMaintenanceDate: '2026-06-01',
+  })));
   const [bookings, setBookings] = useState<Booking[]>(dummyBookings);
   const [wallets, setWallets] = useState<Wallet[]>(dummyWallets);
-  const [transactions, setTransactions] = useState<Transaction[]>(dummyTransactions);
+  const [transactions, setTransactions] = useState<Transaction[]>(dummyTransactions.map(t => ({
+    ...t,
+    method: 'bank_transfer',
+    platformFee: t.amount * 0.1,
+    timestamp: t.date,
+    type: 'payment' as const,
+    status: 'success' as const,
+    userId: 'u1',
+    userName: 'Siti Aminah'
+  })));
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [favorites, setFavorites] = useState<FavoriteLocation[]>([]);
   const [pickupHistory, setPickupHistory] = useState<PickupHistory[]>([]);
@@ -64,6 +85,11 @@ export const ShuttleProvider = ({ children }: { children: ReactNode }) => {
     maxWithdrawal: 10000000,
     serviceFee: 2500,
     maintenanceMode: false,
+    platformFeePercentage: 10,
+    driverCommissionPercentage: 80,
+    basePricePerKm: 5000,
+    currency: 'IDR',
+    history: [],
   });
   const [mapLayer, setMapLayerState] = useState<MapLayerType>(() => {
     const saved = localStorage.getItem('ridewise_map_layer');
@@ -95,16 +121,34 @@ export const ShuttleProvider = ({ children }: { children: ReactNode }) => {
 
   const login = (email: string, _password: string, role: UserRole): boolean => {
     if (role === 'customer') {
-      setCurrentUser({ id: 'u1', name: 'Siti Aminah', email, phone: '081200000001', role: 'customer' });
+      setCurrentUser({ id: 'u1', name: 'Siti Aminah', email, phone: '081200000001', role: 'customer', status: 'active' });
     } else if (role === 'driver') {
       const driver = drivers.find(d => d.email === email);
       if (driver) {
-        setCurrentUser({ id: driver.id, name: driver.name, email: driver.email, phone: driver.phone, role: 'driver' });
+        setCurrentUser({ id: driver.id, name: driver.name, email: driver.email, phone: driver.phone, role: 'driver', status: 'active' });
       } else {
-        setCurrentUser({ id: 'd1', name: 'Budi Santoso', email, phone: '081234567890', role: 'driver' });
+        setCurrentUser({ id: 'd1', name: 'Budi Santoso', email, phone: '081234567890', role: 'driver', status: 'active' });
       }
+    } else if (role === 'superadmin') {
+      setCurrentUser({ 
+        id: 'sa1', 
+        name: 'Super Admin', 
+        email, 
+        phone: '081299999999', 
+        role: 'superadmin',
+        status: 'active',
+        permissions: ['manage_admins', 'manage_business', 'manage_system', 'view_analytics', 'manage_finance']
+      });
     } else {
-      setCurrentUser({ id: 'admin1', name: 'Administrator', email, phone: '081200000000', role: 'admin' });
+      setCurrentUser({ 
+        id: 'admin1', 
+        name: 'Administrator', 
+        email, 
+        phone: '081200000000', 
+        role: 'admin', 
+        status: 'active',
+        permissions: ['manage_users', 'manage_drivers', 'manage_vehicles', 'manage_routes']
+      });
     }
     return true;
   };

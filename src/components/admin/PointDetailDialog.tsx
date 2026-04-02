@@ -100,25 +100,31 @@ export const PointDetailDialog = ({
 
               {/* Info Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Card className="border-none bg-slate-50 dark:bg-slate-900">
-                  <CardContent className="p-4 flex items-start gap-3">
-                    <Navigation className="h-5 w-5 text-blue-500 mt-0.5" />
-                    <div>
-                      <p className="text-xs text-muted-foreground uppercase font-semibold">
-                        Jarak dari Anda
+                <Card className="bg-slate-50 dark:bg-slate-900 border-none shadow-sm">
+                  <CardContent className="p-4 space-y-2">
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Harga Tiket</p>
+                    <div className="flex items-center gap-2">
+                      <div className="bg-primary/20 p-2 rounded-lg">
+                        <Navigation className="h-4 w-4 text-primary" />
+                      </div>
+                      <p className="text-xl font-black text-primary">
+                        {(point as any).price > 0 ? (
+                          new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format((point as any).price)
+                        ) : (
+                          "FREE / DEST"
+                        )}
                       </p>
-                      <p className="font-medium">1.2 km</p>
                     </div>
                   </CardContent>
                 </Card>
-                <Card className="border-none bg-slate-50 dark:bg-slate-900">
-                  <CardContent className="p-4 flex items-start gap-3">
-                    <Clock className="h-5 w-5 text-orange-500 mt-0.5" />
-                    <div>
-                      <p className="text-xs text-muted-foreground uppercase font-semibold">
-                        Estimasi Waktu
-                      </p>
-                      <p className="font-medium">5 - 8 Menit</p>
+                <Card className="bg-slate-50 dark:bg-slate-900 border-none shadow-sm">
+                  <CardContent className="p-4 space-y-2">
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Total Booking</p>
+                    <div className="flex items-center gap-2">
+                      <div className="bg-emerald-500/20 p-2 rounded-lg">
+                        <History className="h-4 w-4 text-emerald-600" />
+                      </div>
+                      <p className="text-xl font-black text-emerald-600">{pointBookings.length} Trip</p>
                     </div>
                   </CardContent>
                 </Card>

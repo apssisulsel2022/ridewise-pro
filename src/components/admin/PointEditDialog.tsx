@@ -34,6 +34,7 @@ const formSchema = z.object({
   lat: z.number(),
   lng: z.number(),
   notes: z.string().optional(),
+  price: z.number().min(0, "Harga tidak boleh negatif"),
 });
 
 interface PointEditDialogProps {
@@ -60,6 +61,7 @@ export const PointEditDialog = ({
       lat: 0,
       lng: 0,
       notes: "",
+      price: 0,
     },
   });
 
@@ -73,6 +75,7 @@ export const PointEditDialog = ({
         lat: point.lat,
         lng: point.lng,
         notes: point.notes || "",
+        price: point.price || 0,
       });
     }
   }, [point, form]);
@@ -222,6 +225,25 @@ export const PointEditDialog = ({
                     <Textarea
                       {...field}
                       placeholder="Contoh: Dekat halte bus, depan Indomaret..."
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="price"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-primary font-bold">Harga Tiket (Rp)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      {...field}
+                      onChange={(e) => field.onChange(Number(e.target.value))}
+                      className="border-primary/30"
                     />
                   </FormControl>
                   <FormMessage />

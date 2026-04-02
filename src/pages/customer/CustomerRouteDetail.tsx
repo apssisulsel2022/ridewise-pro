@@ -3,7 +3,7 @@ import { useShuttle } from '@/contexts/ShuttleContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, MapPin, Clock, Users } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, Users, Navigation } from 'lucide-react';
 import { formatRupiah } from '@/data/dummy';
 
 const CustomerRouteDetail = () => {
@@ -29,17 +29,35 @@ const CustomerRouteDetail = () => {
         <ArrowLeft className="h-4 w-4 mr-1" /> Kembali
       </Button>
 
-      <div className="bg-primary text-primary-foreground rounded-xl p-4">
-        <h2 className="text-xl font-bold">{route.name}</h2>
-        <p className="text-sm opacity-80">{(route.distanceMeters / 1000).toFixed(0)} km · {formatRupiah(route.price)}</p>
+      <div className="bg-primary text-primary-foreground rounded-xl p-6 shadow-lg shadow-primary/20">
+        <h2 className="text-2xl font-bold tracking-tight">{route.name}</h2>
+        <div className="flex items-center gap-2 mt-2 opacity-90 text-sm font-medium">
+          <Navigation className="h-4 w-4" />
+          <span>{(route.distanceMeters / 1000).toFixed(1)} km Perjalanan</span>
+        </div>
       </div>
 
       {/* Pickup Points */}
-      <div>
-        <h3 className="font-semibold mb-2 flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" /> Titik Penjemputan</h3>
-        <div className="flex gap-2 flex-wrap">
+      <div className="space-y-3">
+        <h3 className="font-bold text-lg flex items-center gap-2 px-1">
+          <MapPin className="h-5 w-5 text-primary" /> 
+          Titik Penjemputan & Tarif
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {points.map(p => (
-            <Badge key={p.id} variant="outline" className="px-3 py-1.5">{p.code} — {p.name}</Badge>
+            <Card key={p.id} className="border-none shadow-sm bg-slate-50/50 hover:bg-slate-100 transition-colors">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Badge variant="outline" className="h-6 w-6 rounded-full p-0 flex items-center justify-center font-mono text-[10px] bg-white border-slate-200">{p.code}</Badge>
+                  <span className="font-semibold text-sm">{p.name}</span>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-bold text-primary">
+                    {p.price > 0 ? formatRupiah(p.price) : <span className="text-[10px] text-muted-foreground uppercase tracking-widest">Tujuan Akhir</span>}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       </div>
