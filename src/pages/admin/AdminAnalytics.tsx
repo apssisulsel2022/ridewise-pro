@@ -7,7 +7,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 const COLORS = ['hsl(221,83%,53%)', 'hsl(160,84%,39%)', 'hsl(38,92%,50%)', 'hsl(0,84%,60%)'];
 
 const AdminAnalytics = () => {
-  const { bookings, routes, schedules } = useShuttle();
+  const { bookings, routes, schedules, rayons } = useShuttle();
 
   const totalRevenue = bookings.filter(b => b.paymentStatus === 'paid').reduce((sum, b) => sum + b.price, 0);
   const totalBookings = bookings.length;
@@ -20,10 +20,10 @@ const AdminAnalytics = () => {
   })).filter(r => r.revenue > 0);
 
   // Booking by rayon
-  const bookingByRayon = ['A', 'B', 'C', 'D'].map(rayon => {
-    const routeIds = routes.filter(r => r.rayon === rayon).map(r => r.id);
+  const bookingByRayon = rayons.map(rayon => {
+    const routeIds = routes.filter(route => route.rayonId === rayon.id).map(route => route.id);
     return {
-      name: `Rayon ${rayon}`,
+      name: rayon.name,
       value: bookings.filter(b => routeIds.includes(b.routeId)).length,
     };
   }).filter(r => r.value > 0);
