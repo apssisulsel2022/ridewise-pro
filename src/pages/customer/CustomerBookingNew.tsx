@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArrowLeft } from 'lucide-react';
 import { formatRupiah, generateSeats } from '@/data/dummy';
 import { toast } from 'sonner';
+import { PaymentModal } from '@/components/PaymentModal';
+import { PaymentMethod } from '@/types/shuttle';
 
 const CustomerBookingNew = () => {
   const [searchParams] = useSearchParams();
