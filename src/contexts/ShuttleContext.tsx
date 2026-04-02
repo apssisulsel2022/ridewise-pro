@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { User, UserRole, Booking, Schedule, Route, RoutePoint, Driver, Vehicle, Wallet, Transaction, AuditLog, SystemConfig, MapLayerType } from '@/types/shuttle';
+import { User, UserRole, Booking, Schedule, Route, RoutePoint, Driver, Vehicle, Wallet, Transaction, AuditLog, SystemConfig, MapLayerType, FavoriteLocation, PickupHistory } from '@/types/shuttle';
 import { dummyRoutes, dummyRoutePoints, dummySchedules, dummyDrivers, dummyVehicles, dummyBookings, dummyWallets, dummyTransactions, dummyCustomers } from '@/data/dummy';
 
 interface ShuttleContextType {
@@ -16,11 +16,16 @@ interface ShuttleContextType {
   wallets: Wallet[];
   transactions: Transaction[];
   auditLogs: AuditLog[];
+  favorites: FavoriteLocation[];
+  pickupHistory: PickupHistory[];
   systemConfig: SystemConfig;
   mapLayer: MapLayerType;
   addBooking: (booking: Booking) => void;
   addTransaction: (transaction: Transaction) => void;
   addAuditLog: (action: string, details: string) => void;
+  addFavorite: (favorite: Omit<FavoriteLocation, 'id' | 'userId'>) => void;
+  removeFavorite: (id: string) => void;
+  addPickupHistory: (point: { pointId: string; pointName: string }) => void;
   updateSystemConfig: (config: Partial<SystemConfig>) => void;
   setMapLayer: (layer: MapLayerType) => void;
   withdrawBalance: (amount: number, bankName: string, accountNumber: string) => Promise<{ success: boolean; message: string; transactionId?: string }>;
@@ -52,6 +57,8 @@ export const ShuttleProvider = ({ children }: { children: ReactNode }) => {
   const [wallets, setWallets] = useState<Wallet[]>(dummyWallets);
   const [transactions, setTransactions] = useState<Transaction[]>(dummyTransactions);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [favorites, setFavorites] = useState<FavoriteLocation[]>([]);
+  const [pickupHistory, setPickupHistory] = useState<PickupHistory[]>([]);
   const [systemConfig, setSystemConfig] = useState<SystemConfig>({
     minWithdrawal: 50000,
     maxWithdrawal: 10000000,
@@ -104,7 +111,41 @@ export const ShuttleProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = () => setCurrentUser(null);
 
-  const addBooking = (booking: Booking) => setBookings(prev => [...prev, booking]);
+  const addBooking = (booking: Booking) => {
+    setBookings(prev => [...prev, booking]);
+    addPickupHistory({ pointId: booking.pickupPointId, pointName: booking.pickupPointName });
+  };
+
+  const addFavorite = (favorite: Omit<FavoriteLocation, 'id' | 'userId'>) => {
+    if (!currentUser) return;
+    const newFavorite: FavoriteLocation = {
+      id: `fav-${Date.now()}`,
+      userId: currentUser.id,
+      ...favorite
+    };
+    setFavorites(prev => [...prev, newFavorite]);
+    addAuditLog('Add Favorite Location', `User added ${favorite.name} as favorite`);
+  };
+
+  const removeFavorite = (id: string) => {
+    setFavorites(prev => prev.filter(f => f.id !== id));
+    addAuditLog('Remove Favorite Location', `User removed favorite location ${id}`);
+  };
+
+  const addPickupHistory = (point: { pointId: string; pointName: string }) => {
+    if (!currentUser) return;
+    const newHistory: PickupHistory = {
+      id: `hist-${Date.now()}`,
+      userId: currentUser.id,
+      pointId: point.pointId,
+      pointName: point.pointName,
+      timestamp: new Date().toISOString(),
+    };
+    setPickupHistory(prev => {
+      const filtered = prev.filter(h => h.pointId !== point.pointId);
+      return [newHistory, ...filtered].slice(0, 10);
+    });
+  };
 
   const addTransaction = (transaction: Transaction) => {
     setTransactions(prev => [...prev, transaction]);
@@ -179,8 +220,8 @@ export const ShuttleProvider = ({ children }: { children: ReactNode }) => {
   return (
     <ShuttleContext.Provider value={{
       currentUser, login, logout,
-      routes, routePoints, schedules, drivers, customers, vehicles, bookings, wallets, transactions, auditLogs, systemConfig, mapLayer,
-      addBooking, addTransaction, addAuditLog, updateSystemConfig, setMapLayer, withdrawBalance, updateScheduleStatus, updateRoutePoints,
+      routes, routePoints, schedules, drivers, customers, vehicles, bookings, wallets, transactions, auditLogs, favorites, pickupHistory, systemConfig, mapLayer,
+      addBooking, addTransaction, addAuditLog, addFavorite, removeFavorite, addPickupHistory, updateSystemConfig, setMapLayer, withdrawBalance, updateScheduleStatus, updateRoutePoints,
       setRoutes, setRoutePoints, setSchedules, setDrivers, setCustomers, setVehicles, setBookings, setWallets, setTransactions, setAuditLogs,
     }}>
       {children}

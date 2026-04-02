@@ -139,6 +139,23 @@ export interface AuditLog {
   ipAddress?: string;
 }
 
+export interface FavoriteLocation {
+  id: string;
+  userId: string;
+  name: string;
+  address: string;
+  lat: number;
+  lng: number;
+}
+
+export interface PickupHistory {
+  id: string;
+  userId: string;
+  pointId: string;
+  pointName: string;
+  timestamp: string;
+}
+
 export interface SystemConfig {
   minWithdrawal: number;
   maxWithdrawal: number;
