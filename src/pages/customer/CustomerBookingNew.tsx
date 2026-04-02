@@ -51,10 +51,11 @@ const CustomerBookingNew = () => {
       status: 'confirmed' as const,
       bookingDate: new Date().toISOString().split('T')[0],
       departureTime: schedule.departureTime,
+      paymentStatus: 'pending' as const,
+      paymentMethod: null,
     };
     addBooking(newBooking);
-    toast.success('Booking berhasil!');
-    navigate(`/customer/booking/${newBooking.id}`);
+    setShowPayment(true);
   };
 
   return (
