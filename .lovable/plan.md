@@ -1,63 +1,89 @@
 
 
-# Shuttle / Rental Mobil Management System
+# Fitur Advanced — ShuttleKu Management System
 
-Sistem manajemen shuttle dengan 3 role: Customer (mobile PWA), Driver (mobile PWA), dan Admin (web dashboard). Tahap awal menggunakan data dummy.
+Karena ini masih tahap UI mockup (tanpa backend/Supabase), semua fitur akan diimplementasikan sebagai UI dengan data dummy dan simulasi. Payment gateway dan Firebase notification akan disiapkan sebagai UI/settings page, siap diintegrasikan saat backend ditambahkan.
 
-## Design System
-- **Warna utama**: Biru (#2563EB) dan Hijau (#10B981) — transport theme
-- **Layout**: Card-based, modern, clean
-- **Font**: Inter (sudah ada di project)
+## 1. GPS Tracking Driver (Leaflet Map)
 
-## Halaman & Fitur
+**File baru:** `src/pages/driver/DriverTracking.tsx`, `src/pages/admin/AdminTracking.tsx`
 
-### 1. Landing Page / Role Selector
-- Pilih role: Customer, Driver, atau Admin
-- Navigasi ke login masing-masing
+- Install `leaflet` + `react-leaflet` + `@types/leaflet`
+- **Driver side**: Peta Leaflet menampilkan rute aktif dengan marker posisi driver (simulasi bergerak antar titik penjemputan). Tombol "Mulai Tracking" / "Berhenti"
+- **Admin side**: Halaman monitoring peta dengan semua driver aktif ditampilkan sebagai marker. Klik marker untuk lihat info driver + rute
+- **Customer side**: Di `CustomerBookingDetail`, tambah peta kecil menunjukkan posisi driver (simulasi)
+- Tambah data dummy koordinat lat/lng ke setiap `RoutePoint`
+- Update `AdminLayout` sidebar: tambah menu "Tracking"
 
-### 2. Customer (Mobile-First PWA)
-- **Login/Register** — form sederhana dengan dummy auth
-- **Home** — pilih rute (Rayon A/B/C/D), lihat jadwal tersedia
-- **Pilih Rute** — daftar rute dengan titik penjemputan (J1, J2, J3)
-- **Pilih Jadwal** — list jam keberangkatan, sisa kursi ditampilkan
-- **Seat Selection** — visual grid kursi (hijau=kosong, merah=terisi), pilih kursi
-- **Konfirmasi Booking** — ringkasan: rute, jadwal, kursi, harga (berdasarkan jarak)
-- **Booking Berhasil** — notifikasi toast + detail tiket
-- **Riwayat Perjalanan** — list booking sebelumnya dengan status
-- **Detail Perjalanan** — info lengkap per booking
+## 2. Payment Gateway UI (Settings-based)
 
-### 3. Driver (Mobile-First PWA)
-- **Login Driver** — form login
-- **Dashboard** — daftar perjalanan hari ini
-- **Detail Perjalanan** — daftar penumpang, status kursi (kosong/terisi)
-- **Update Status** — tombol mulai & selesai perjalanan
+**File baru:** `src/pages/admin/AdminPaymentSettings.tsx`, `src/components/PaymentModal.tsx`
 
-### 4. Admin (Web Dashboard dengan Sidebar)
-- **Login Admin**
-- **Dashboard Overview** — statistik booking, perjalanan aktif
-- **CRUD Rute** — kelola Rayon A, B, C, D
-- **CRUD Titik Penjemputan** — kelola J1, J2, dst per rute
-- **CRUD Jadwal** — kelola jam keberangkatan
-- **CRUD Driver** — kelola data driver
-- **CRUD Kendaraan** — kelola data kendaraan + kapasitas kursi
-- **Assign Driver** — assign driver ke rute/jadwal
-- **Monitoring Booking** — tabel semua booking real-time
-- **Laporan Perjalanan** — ringkasan & filter per tanggal
+- **Admin Settings page**: Form konfigurasi payment gateway — pilih provider (Midtrans/Xendit), input Server Key, Client Key, environment (Sandbox/Production). Data disimpan di context
+- **Customer booking flow**: Setelah pilih kursi, muncul modal pembayaran dengan pilihan metode (Transfer Bank, E-Wallet, QRIS). Tampilkan simulasi halaman pembayaran dengan countdown timer
+- Tambah field `paymentStatus` dan `paymentMethod` ke type `Booking`
+- Status pembayaran: pending → paid → expired/failed
+- Update `AdminLayout` sidebar: tambah menu "Payment Settings"
 
-### 5. Data Dummy
-- 4 Rayon (A-D) dengan rute masing-masing
-- Titik penjemputan per rute (J1-J5)
-- Jadwal keberangkatan (pagi, siang, sore)
-- Kendaraan dengan 8-12 kursi
-- Beberapa booking contoh
-- Harga berdasarkan jarak (Rp/meter)
+## 3. Notifikasi (UI Notification Center)
 
-### 6. State Management
-- React Context untuk auth state dan data management
-- Shared types untuk konsistensi data antar role
+**File baru:** `src/components/NotificationCenter.tsx`, `src/contexts/NotificationContext.tsx`
 
-### 7. Navigasi
-- Customer & Driver: bottom navigation bar (mobile style)
-- Admin: sidebar navigation (desktop)
-- Routing terpisah per role: `/customer/*`, `/driver/*`, `/admin/*`
+- Context untuk menyimpan notifikasi in-app (bell icon dengan badge counter)
+- Auto-generate notifikasi saat: booking berhasil, pembayaran dikonfirmasi, perjalanan dimulai, perjalanan selesai
+- Notification dropdown di header semua layout (Customer, Driver, Admin)
+- Setiap notifikasi: icon, judul, pesan, timestamp, read/unread
+- Catatan: Firebase push notification memerlukan backend — saat ini simulasi in-app saja
+
+## 4. Dashboard Analytics (Recharts)
+
+**File baru:** `src/pages/admin/AdminAnalytics.tsx`
+
+- Install `recharts`
+- Upgrade `AdminReports` atau buat halaman baru `AdminAnalytics`:
+  - **Bar chart**: Pendapatan per rute
+  - **Line chart**: Trend booking harian (data dummy 7 hari)
+  - **Pie chart**: Distribusi booking per rayon (A/B/C/D)
+  - **Area chart**: Occupancy rate per jadwal
+- KPI cards: Total revenue, avg occupancy %, booking growth, top route
+- Filter: rentang tanggal, rayon
+- Update sidebar: tambah menu "Analytics"
+
+## 5. E-Ticket / QR Code
+
+**File baru:** `src/components/ETicket.tsx`
+
+- Install `qrcode.react`
+- **E-Ticket component**: Card bergaya tiket pesawat dengan:
+  - Header: logo + nama perusahaan
+  - Info: rute, tanggal, waktu, kursi, titik jemput, harga
+  - QR Code berisi data booking (JSON encoded: bookingId, scheduleId, seatNumber)
+  - Barcode-style ID di bawah
+- Ditampilkan di `CustomerBookingDetail` dan `CustomerTickets`
+- Tombol "Download Tiket" (generate as image via html2canvas atau print-friendly CSS)
+- **Driver side**: Di `DriverTripDetail`, tambah tombol "Scan QR" (simulasi — buka modal, input booking ID manual, validasi terhadap data booking)
+
+## Technical Details
+
+**Dependencies baru:**
+- `leaflet`, `react-leaflet`, `@types/leaflet` — peta GPS
+- `recharts` — chart analytics
+- `qrcode.react` — QR code generation
+
+**Type updates (`shuttle.ts`):**
+- `RoutePoint`: tambah `lat`, `lng`
+- `Booking`: tambah `paymentStatus`, `paymentMethod`, `qrCode`
+- Baru: `Notification`, `PaymentConfig` interfaces
+
+**Context updates:**
+- `ShuttleContext`: tambah payment config state
+- Baru: `NotificationContext` untuk notifikasi in-app
+
+**Route updates (`App.tsx`):**
+- `/admin/analytics` — Dashboard Analytics
+- `/admin/tracking` — GPS Monitoring
+- `/admin/payment-settings` — Payment Settings
+- `/driver/tracking` — Driver GPS view
+
+**Estimated file changes:** ~12 file baru, ~8 file edit
 
