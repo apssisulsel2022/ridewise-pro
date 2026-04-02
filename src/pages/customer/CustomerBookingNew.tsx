@@ -66,6 +66,7 @@ const CustomerBookingNew = () => {
       paymentMethod: null,
     };
     addBooking(newBooking);
+    setLastBookingId(newBooking.id);
     setShowPayment(true);
   };
 
