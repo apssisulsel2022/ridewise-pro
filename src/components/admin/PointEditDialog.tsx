@@ -21,6 +21,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
@@ -35,6 +36,8 @@ const formSchema = z.object({
   lng: z.number(),
   notes: z.string().optional(),
   price: z.number().min(0, "Harga tidak boleh negatif"),
+  status: z.enum(['active', 'inactive']),
+  rayonId: z.string().min(1, "Rayon harus dipilih"),
 });
 
 interface PointEditDialogProps {
@@ -48,7 +51,7 @@ export const PointEditDialog = ({
   open,
   onOpenChange,
 }: PointEditDialogProps) => {
-  const { setRoutePoints } = useShuttle();
+  const { routePoints, setRoutePoints, rayons } = useShuttle();
   const [loading, setLoading] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -62,6 +65,8 @@ export const PointEditDialog = ({
       lng: 0,
       notes: "",
       price: 0,
+      status: 'active',
+      rayonId: '',
     },
   });
 
@@ -76,6 +81,8 @@ export const PointEditDialog = ({
         lng: point.lng,
         notes: point.notes || "",
         price: point.price || 0,
+        status: point.status || 'active',
+        rayonId: point.rayonId || '',
       });
     }
   }, [point, form]);
@@ -83,9 +90,26 @@ export const PointEditDialog = ({
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (!point) return;
 
+    const normalizedCode = values.code.trim().toLowerCase();
+    const normalizedName = values.name.trim().toLowerCase();
+    const duplicate = routePoints.some(
+      (p) =>
+        p.id !== point.id &&
+        p.routeId === point.routeId &&
+        (
+          p.code.trim().toLowerCase() === normalizedCode ||
+          p.name.trim().toLowerCase() === normalizedName ||
+          (p.lat === values.lat && p.lng === values.lng)
+        )
+    );
+
+    if (duplicate) {
+      toast.error('Duplikasi titik jemput ditemukan pada rute yang sama. Periksa kode, nama, atau koordinat.');
+      return;
+    }
+
     setLoading(true);
     try {
-      // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       setRoutePoints((prev) =>
@@ -112,7 +136,7 @@ export const PointEditDialog = ({
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="code"
@@ -138,6 +162,52 @@ export const PointEditDialog = ({
                         {...field}
                         onChange={(e) => field.onChange(Number(e.target.value))}
                       />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="rayonId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Rayon</FormLabel>
+                    <FormControl>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pilih rayon" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {rayons.map((rayon) => (
+                            <SelectItem key={rayon.id} value={rayon.id}>{rayon.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status</FormLabel>
+                    <FormControl>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pilih status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="active">Aktif</SelectItem>
+                          <SelectItem value="inactive">Non-aktif</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </FormControl>
                     <FormMessage />
                   </FormItem>

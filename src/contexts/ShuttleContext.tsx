@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { User, UserRole, Booking, Schedule, Route, RoutePoint, Driver, Vehicle, Wallet, Transaction, AuditLog, SystemConfig, MapLayerType, FavoriteLocation, PickupHistory } from '@/types/shuttle';
-import { dummyRoutes, dummyRoutePoints, dummySchedules, dummyDrivers, dummyVehicles, dummyBookings, dummyWallets, dummyTransactions, dummyCustomers } from '@/data/dummy';
+import { User, UserRole, Booking, Schedule, Route, RoutePoint, Driver, Vehicle, Wallet, Transaction, AuditLog, SystemConfig, MapLayerType, FavoriteLocation, PickupHistory, Rayon } from '@/types/shuttle';
+import { dummyRoutes, dummyRoutePoints, dummySchedules, dummyDrivers, dummyVehicles, dummyBookings, dummyWallets, dummyTransactions, dummyCustomers, dummyRayons } from '@/data/dummy';
 
 interface ShuttleContextType {
   currentUser: User | null;
   login: (email: string, password: string, role: UserRole) => boolean;
   logout: () => void;
+  rayons: Rayon[];
   routes: Route[];
   routePoints: RoutePoint[];
   schedules: Schedule[];
@@ -31,6 +32,8 @@ interface ShuttleContextType {
   withdrawBalance: (amount: number, bankName: string, accountNumber: string) => Promise<{ success: boolean; message: string; transactionId?: string }>;
   updateScheduleStatus: (scheduleId: string, status: Schedule['status']) => void;
   updateRoutePoints: (routeId: string, points: RoutePoint[]) => void;
+  updateScheduleAssignment: (scheduleId: string, updates: Partial<Pick<Schedule, 'vehicleId' | 'driverId' | 'status'>>) => void;
+  setRayons: React.Dispatch<React.SetStateAction<Rayon[]>>;
   setRoutes: React.Dispatch<React.SetStateAction<Route[]>>;
   setRoutePoints: React.Dispatch<React.SetStateAction<RoutePoint[]>>;
   setSchedules: React.Dispatch<React.SetStateAction<Schedule[]>>;
@@ -47,6 +50,7 @@ const ShuttleContext = createContext<ShuttleContextType | undefined>(undefined);
 
 export const ShuttleProvider = ({ children }: { children: ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [rayons, setRayons] = useState<Rayon[]>(dummyRayons);
   const [routes, setRoutes] = useState<Route[]>(dummyRoutes);
   const [routePoints, setRoutePoints] = useState<RoutePoint[]>(dummyRoutePoints);
   const [schedules, setSchedules] = useState<Schedule[]>(dummySchedules);
@@ -253,6 +257,13 @@ export const ShuttleProvider = ({ children }: { children: ReactNode }) => {
     setSchedules(prev => prev.map(s => s.id === scheduleId ? { ...s, status } : s));
   };
 
+  const updateScheduleAssignment = (scheduleId: string, updates: Partial<Pick<Schedule, 'vehicleId' | 'driverId' | 'status'>>) => {
+    setSchedules(prev => prev.map(s => s.id === scheduleId ? { ...s, ...updates } : s));
+    if (updates.vehicleId || updates.driverId || updates.status) {
+      addAuditLog('Update Schedule Assignment', `Schedule ${scheduleId} updated with ${JSON.stringify(updates)}`);
+    }
+  };
+
   const updateRoutePoints = (routeId: string, points: RoutePoint[]) => {
     setRoutePoints(prev => {
       const filtered = prev.filter(p => p.routeId !== routeId);
@@ -264,9 +275,9 @@ export const ShuttleProvider = ({ children }: { children: ReactNode }) => {
   return (
     <ShuttleContext.Provider value={{
       currentUser, login, logout,
-      routes, routePoints, schedules, drivers, customers, vehicles, bookings, wallets, transactions, auditLogs, favorites, pickupHistory, systemConfig, mapLayer,
-      addBooking, addTransaction, addAuditLog, addFavorite, removeFavorite, addPickupHistory, updateSystemConfig, setMapLayer, withdrawBalance, updateScheduleStatus, updateRoutePoints,
-      setRoutes, setRoutePoints, setSchedules, setDrivers, setCustomers, setVehicles, setBookings, setWallets, setTransactions, setAuditLogs,
+      rayons, routes, routePoints, schedules, drivers, customers, vehicles, bookings, wallets, transactions, auditLogs, favorites, pickupHistory, systemConfig, mapLayer,
+      addBooking, addTransaction, addAuditLog, addFavorite, removeFavorite, addPickupHistory, updateSystemConfig, setMapLayer, withdrawBalance, updateScheduleStatus, updateScheduleAssignment, updateRoutePoints,
+      setRayons, setRoutes, setRoutePoints, setSchedules, setDrivers, setCustomers, setVehicles, setBookings, setWallets, setTransactions, setAuditLogs,
     }}>
       {children}
     </ShuttleContext.Provider>

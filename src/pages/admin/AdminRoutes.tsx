@@ -11,12 +11,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Pencil, Trash2, Map as MapIcon, Navigation, Search, TrendingUp, Users, Info, ArrowUpDown, ChevronUp, ChevronDown, PackageOpen, Loader2 } from 'lucide-react';
 import { formatRupiah } from '@/data/dummy';
 import { toast } from 'sonner';
-import { Route, RoutePoint } from '@/types/shuttle';
+import { Route, RoutePoint, Schedule } from '@/types/shuttle';
 import RouteEditorMap from '@/components/map/RouteEditorMap';
 import { cn } from '@/lib/utils';
 
 const AdminRoutes = () => {
-  const { routes, setRoutes, routePoints, updateRoutePoints, schedules, bookings, drivers, vehicles } = useShuttle();
+  const { routes, setRoutes, routePoints, updateRoutePoints, schedules, bookings, drivers, vehicles, rayons, updateScheduleAssignment } = useShuttle();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Route | null>(null);
   const [selectedRouteForMap, setSelectedRouteForMap] = useState<Route | null>(null);
@@ -26,7 +26,7 @@ const AdminRoutes = () => {
   
   const [form, setForm] = useState({ 
     name: '', 
-    rayon: 'A' as Route['rayon'], 
+    rayonId: rayons[0]?.id || '',
     origin: '', 
     destination: '', 
     distanceMeters: 0
@@ -37,6 +37,7 @@ const AdminRoutes = () => {
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
     if (!form.name.trim()) newErrors.name = 'Nama rute harus diisi';
+    if (!form.rayonId) newErrors.rayonId = 'Rayon operasional harus dipilih';
     if (!form.origin.trim()) newErrors.origin = 'Titik asal harus diisi';
     if (!form.destination.trim()) newErrors.destination = 'Titik tujuan harus diisi';
     if (form.distanceMeters <= 0) newErrors.distanceMeters = 'Jarak harus lebih dari 0';
@@ -71,14 +72,14 @@ const AdminRoutes = () => {
 
   const openNew = () => { 
     setEditing(null); 
-    setForm({ name: '', rayon: 'A', origin: '', destination: '', distanceMeters: 0 }); 
+    setForm({ name: '', rayonId: rayons[0]?.id || '', origin: '', destination: '', distanceMeters: 0 }); 
     setErrors({});
     setOpen(true); 
   };
 
   const openEdit = (r: Route) => { 
     setEditing(r); 
-    setForm({ name: r.name, rayon: r.rayon, origin: r.origin, destination: r.destination, distanceMeters: r.distanceMeters }); 
+    setForm({ name: r.name, rayonId: r.rayonId, origin: r.origin, destination: r.destination, distanceMeters: r.distanceMeters }); 
     setErrors({});
     setOpen(true); 
   };
@@ -119,6 +120,16 @@ const AdminRoutes = () => {
       // Update distance in the route itself
       setRoutes(prev => prev.map(r => r.id === selectedRouteForMap.id ? { ...r, distanceMeters: distance } : r));
     }
+  };
+
+  const selectedRouteSchedules = useMemo(
+    () => selectedRouteForMap ? schedules.filter((s) => s.routeId === selectedRouteForMap.id) : [],
+    [selectedRouteForMap, schedules]
+  );
+
+  const handleScheduleAssignment = (scheduleId: string, updates: Partial<Pick<Schedule, 'vehicleId' | 'driverId' | 'status'>>) => {
+    updateScheduleAssignment(scheduleId, updates);
+    toast.success('Penjadwalan kendaraan berhasil diperbarui');
   };
 
   const SortIcon = ({ column }: { column: keyof Route }) => {
@@ -181,11 +192,16 @@ const AdminRoutes = () => {
                 </div>
                 
                 <div className="grid gap-2">
-                  <Label className="font-semibold">Rayon Operasional</Label>
-                  <Select value={form.rayon} onValueChange={v => setForm({...form, rayon: v as Route['rayon']})}>
-                    <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
-                    <SelectContent>{['A','B','C','D'].map(r => <SelectItem key={r} value={r}>Rayon {r} (Wilayah {r === 'A' ? 'Utara' : r === 'B' ? 'Selatan' : r === 'C' ? 'Barat' : 'Timur'})</SelectItem>)}</SelectContent>
+                  <Label className={cn("font-semibold", errors.rayonId && "text-destructive")}>Rayon Operasional</Label>
+                  <Select value={form.rayonId} onValueChange={v => setForm({...form, rayonId: v})}>
+                    <SelectTrigger className="h-11"><SelectValue placeholder="Pilih rayon" /></SelectTrigger>
+                    <SelectContent>
+                      {rayons.map((rayon) => (
+                        <SelectItem key={rayon.id} value={rayon.id}>{rayon.name} — {rayon.coverageArea}</SelectItem>
+                      ))}
+                    </SelectContent>
                   </Select>
+                  {errors.rayonId && <p className="text-[10px] font-bold text-destructive uppercase">{errors.rayonId}</p>}
                 </div>
               </div>
 
@@ -273,9 +289,9 @@ const AdminRoutes = () => {
                           Informasi Rute <SortIcon column="name" />
                         </div>
                       </TableHead>
-                      <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('rayon')}>
+                      <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('rayonId')}>
                         <div className="flex items-center font-bold uppercase text-[11px] tracking-widest">
-                          Rayon <SortIcon column="rayon" />
+                          Rayon <SortIcon column="rayonId" />
                         </div>
                       </TableHead>
                       <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('distanceMeters')}>
@@ -315,15 +331,19 @@ const AdminRoutes = () => {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={cn(
-                            "text-[10px] font-black tracking-widest border-2",
-                            r.rayon === 'A' ? "border-blue-200 text-blue-700 bg-blue-50" :
-                            r.rayon === 'B' ? "border-green-200 text-green-700 bg-green-50" :
-                            r.rayon === 'C' ? "border-orange-200 text-orange-700 bg-orange-50" :
-                            "border-purple-200 text-purple-700 bg-purple-50"
-                          )}>
-                            RAYON {r.rayon}
-                          </Badge>
+                          {(() => {
+                            const routeRayon = rayons.find((rayon) => rayon.id === r.rayonId);
+                            const color = routeRayon?.color || '#64748b';
+                            return (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] font-black tracking-widest border-2"
+                                style={{ borderColor: color, color, backgroundColor: `${color}22` }}
+                              >
+                                {routeRayon?.name || 'Rayon Tidak Diketahui'}
+                              </Badge>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell className="font-mono text-xs text-muted-foreground">
                           {(r.distanceMeters / 1000).toFixed(1)} km
@@ -404,6 +424,73 @@ const AdminRoutes = () => {
                   Sistem Operasional Normal
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-none shadow-lg overflow-hidden">
+            <CardHeader className="pb-2 bg-muted/30">
+              <CardTitle className="text-xs font-bold flex items-center gap-2 uppercase tracking-widest">
+                <Info className="h-4 w-4 text-primary" /> Penjadwalan Kendaraan
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-5 space-y-4">
+              {selectedRouteForMap ? (
+                selectedRouteSchedules.length > 0 ? (
+                  <div className="space-y-4">
+                    {selectedRouteSchedules.map((schedule) => {
+                      const assignedVehicle = vehicles.find((v) => v.id === schedule.vehicleId);
+                      const assignedDriver = drivers.find((d) => d.id === schedule.driverId);
+                      return (
+                        <div key={schedule.id} className="rounded-2xl border p-4 bg-white">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-semibold">Jadwal {schedule.id}</p>
+                              <p className="text-xs text-muted-foreground">Jam berangkat {schedule.departureTime}</p>
+                            </div>
+                            <Badge variant="outline" className="uppercase text-[10px] tracking-[0.3em]">
+                              {schedule.status}
+                            </Badge>
+                          </div>
+                          <div className="grid gap-3 mt-4">
+                            <div className="grid gap-2">
+                              <Label>Driver</Label>
+                              <Select value={schedule.driverId || ''} onValueChange={(value) => handleScheduleAssignment(schedule.id, { driverId: value || null })}>
+                                <SelectTrigger className="h-10"><SelectValue placeholder="Pilih driver" /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="">Tidak ditugaskan</SelectItem>
+                                  {drivers.map((driver) => (
+                                    <SelectItem key={driver.id} value={driver.id}>{driver.name}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="grid gap-2">
+                              <Label>Kendaraan</Label>
+                              <Select value={schedule.vehicleId || ''} onValueChange={(value) => handleScheduleAssignment(schedule.id, { vehicleId: value || null })}>
+                                <SelectTrigger className="h-10"><SelectValue placeholder="Pilih kendaraan" /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="">Tidak ditugaskan</SelectItem>
+                                  {vehicles.map((vehicle) => (
+                                    <SelectItem key={vehicle.id} value={vehicle.id}>{vehicle.name} ({vehicle.plateNumber})</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                          <div className="mt-4 text-sm text-muted-foreground">
+                            <p>Driver sekarang: {assignedDriver?.name || 'Belum ada'}</p>
+                            <p>Kendaraan sekarang: {assignedVehicle?.name || 'Belum ada'}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Tidak ada jadwal terdaftar untuk rute ini. Tambahkan jadwal pada modul penjadwalan jika diperlukan.</p>
+                )
+              ) : (
+                <p className="text-sm text-muted-foreground">Pilih rute untuk melihat dan mengelola penjadwalan kendaraan.</p>
+              )}
             </CardContent>
           </Card>
 

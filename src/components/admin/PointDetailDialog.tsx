@@ -33,7 +33,7 @@ export const PointDetailDialog = ({
   open,
   onOpenChange,
 }: PointDetailDialogProps) => {
-  const { bookings } = useShuttle();
+  const { bookings, rayons } = useShuttle();
   const [loading, setLoading] = useState(true);
   const [pointBookings, setPointBookings] = useState<Booking[]>([]);
 
@@ -99,7 +99,7 @@ export const PointDetailDialog = ({
               </div>
 
               {/* Info Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <Card className="bg-slate-50 dark:bg-slate-900 border-none shadow-sm">
                   <CardContent className="p-4 space-y-2">
                     <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Harga Tiket</p>
@@ -113,6 +113,19 @@ export const PointDetailDialog = ({
                         ) : (
                           "FREE / DEST"
                         )}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-slate-50 dark:bg-slate-900 border-none shadow-sm">
+                  <CardContent className="p-4 space-y-2">
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Rayon</p>
+                    <div className="flex items-center gap-2">
+                      <div className="bg-primary/20 p-2 rounded-lg">
+                        <MapPin className="h-4 w-4 text-primary" />
+                      </div>
+                      <p className="text-xl font-black text-primary">
+                        {rayons.find((rayon) => rayon.id === point.rayonId)?.name || 'Rayon tidak tersedia'}
                       </p>
                     </div>
                   </CardContent>

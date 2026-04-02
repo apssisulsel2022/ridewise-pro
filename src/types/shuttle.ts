@@ -51,10 +51,17 @@ export interface Vehicle {
   nextMaintenanceDate?: string;
 }
 
+export interface Rayon {
+  id: string;
+  name: string;
+  coverageArea: string; // e.g. "Medan Utara, Binjai, Stabat"
+  color: string; // e.g. "#FF5733"
+}
+
 export interface Route {
   id: string;
   name: string;
-  rayon: 'A' | 'B' | 'C' | 'D';
+  rayonId: string;
   origin: string;
   destination: string;
   distanceMeters: number;
@@ -72,6 +79,8 @@ export interface RoutePoint {
   notes?: string;
   imageUrl?: string;
   price: number;
+  status: 'active' | 'inactive';
+  rayonId: string;
 }
 
 export interface Schedule {

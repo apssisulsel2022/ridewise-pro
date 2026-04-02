@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Trash2, Move, Save, Navigation, Loader2, Maximize, Map as MapIcon } from 'lucide-react';
 import { toast } from 'sonner';
-import { calculateTotalRouteDistance, isValidCoordinate } from '@/lib/routeUtils';
+import { calculateDistanceBetweenPoints, calculateTotalRouteDistance, isValidCoordinate } from '@/lib/routeUtils';
 import { Badge } from '@/components/ui/badge';
 
 interface RouteEditorMapProps {
