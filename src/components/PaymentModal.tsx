@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -67,6 +67,11 @@ export const PaymentModal = ({ open, onClose, amount, onConfirm }: PaymentModalP
             {step === 'processing' && 'Memproses Pembayaran'}
             {step === 'success' && 'Pembayaran Berhasil'}
           </DialogTitle>
+          <DialogDescription>
+            {step === 'select' && 'Silakan pilih salah satu metode pembayaran yang tersedia.'}
+            {step === 'processing' && 'Mohon tunggu sebentar selagi sistem memverifikasi transaksi Anda.'}
+            {step === 'success' && 'Tiket Anda telah berhasil dipesan dan dikonfirmasi.'}
+          </DialogDescription>
         </DialogHeader>
 
         {step === 'select' && (

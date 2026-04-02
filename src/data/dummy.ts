@@ -46,6 +46,13 @@ export const dummyDrivers: Driver[] = [
   { id: 'd5', name: 'Fajar Nugroho', email: 'fajar@shuttle.com', phone: '081234567894', licenseNumber: 'SIM-005', status: 'active' },
 ];
 
+export const dummyCustomers: User[] = [
+  { id: 'u1', name: 'Siti Aminah', email: 'siti@example.com', phone: '081200000001', role: 'customer' },
+  { id: 'u2', name: 'Rudi Hartono', email: 'rudi@example.com', phone: '081200000002', role: 'customer' },
+  { id: 'u3', name: 'Linda Susanti', email: 'linda@example.com', phone: '081200000003', role: 'customer' },
+  { id: 'u4', name: 'Bambang Pamungkas', email: 'bambang@example.com', phone: '081200000004', role: 'customer' },
+];
+
 export const dummyVehicles: Vehicle[] = [
   { id: 'v1', name: 'Hiace Commuter', plateNumber: 'BK 1234 AB', capacity: 12, type: 'Minibus', status: 'active' },
   { id: 'v2', name: 'Elf Long', plateNumber: 'BK 5678 CD', capacity: 10, type: 'Minibus', status: 'active' },

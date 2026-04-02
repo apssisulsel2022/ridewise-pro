@@ -1,6 +1,6 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useEffect } from 'react';
-import { LayoutDashboard, MapPin, Navigation, CalendarDays, Users, Bus, Link2, BookOpen, FileText, LogOut, Map, BarChart3, CreditCard } from 'lucide-react';
+import { LayoutDashboard, MapPin, Navigation, CalendarDays, Users, Bus, Link2, BookOpen, FileText, LogOut, Map, BarChart3, CreditCard, Activity, Zap } from 'lucide-react';
 import { useShuttle } from '@/contexts/ShuttleContext';
 import { NotificationCenter } from '@/components/NotificationCenter';
 import { SidebarProvider, Sidebar, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger } from '@/components/ui/sidebar';
@@ -13,11 +13,13 @@ const menuItems = [
   { title: 'Rute', url: '/admin/routes', icon: Navigation },
   { title: 'Titik Jemput', url: '/admin/points', icon: MapPin },
   { title: 'Jadwal', url: '/admin/schedules', icon: CalendarDays },
-  { title: 'Driver', url: '/admin/drivers', icon: Users },
+  { title: 'User Management', url: '/admin/users', icon: Users },
   { title: 'Kendaraan', url: '/admin/vehicles', icon: Bus },
   { title: 'Assign Driver', url: '/admin/assign', icon: Link2 },
   { title: 'Booking', url: '/admin/bookings', icon: BookOpen },
   { title: 'Laporan', url: '/admin/reports', icon: FileText },
+  { title: 'Audit Trail', url: '/admin/audit', icon: Activity },
+  { title: 'Monitoring', url: '/admin/monitoring', icon: Zap },
   { title: 'Payment', url: '/admin/payment-settings', icon: CreditCard },
 ];
 

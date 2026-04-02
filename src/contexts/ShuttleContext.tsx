@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { User, UserRole, Booking, Schedule, Route, RoutePoint, Driver, Vehicle, Wallet, Transaction } from '@/types/shuttle';
-import { dummyRoutes, dummyRoutePoints, dummySchedules, dummyDrivers, dummyVehicles, dummyBookings, dummyWallets, dummyTransactions } from '@/data/dummy';
+import { User, UserRole, Booking, Schedule, Route, RoutePoint, Driver, Vehicle, Wallet, Transaction, AuditLog, SystemConfig, MapLayerType } from '@/types/shuttle';
+import { dummyRoutes, dummyRoutePoints, dummySchedules, dummyDrivers, dummyVehicles, dummyBookings, dummyWallets, dummyTransactions, dummyCustomers } from '@/data/dummy';
 
 interface ShuttleContextType {
   currentUser: User | null;
@@ -10,22 +10,32 @@ interface ShuttleContextType {
   routePoints: RoutePoint[];
   schedules: Schedule[];
   drivers: Driver[];
+  customers: User[];
   vehicles: Vehicle[];
   bookings: Booking[];
   wallets: Wallet[];
   transactions: Transaction[];
+  auditLogs: AuditLog[];
+  systemConfig: SystemConfig;
+  mapLayer: MapLayerType;
   addBooking: (booking: Booking) => void;
   addTransaction: (transaction: Transaction) => void;
+  addAuditLog: (action: string, details: string) => void;
+  updateSystemConfig: (config: Partial<SystemConfig>) => void;
+  setMapLayer: (layer: MapLayerType) => void;
   withdrawBalance: (amount: number, bankName: string, accountNumber: string) => Promise<{ success: boolean; message: string; transactionId?: string }>;
   updateScheduleStatus: (scheduleId: string, status: Schedule['status']) => void;
+  updateRoutePoints: (routeId: string, points: RoutePoint[]) => void;
   setRoutes: React.Dispatch<React.SetStateAction<Route[]>>;
   setRoutePoints: React.Dispatch<React.SetStateAction<RoutePoint[]>>;
   setSchedules: React.Dispatch<React.SetStateAction<Schedule[]>>;
   setDrivers: React.Dispatch<React.SetStateAction<Driver[]>>;
+  setCustomers: React.Dispatch<React.SetStateAction<User[]>>;
   setVehicles: React.Dispatch<React.SetStateAction<Vehicle[]>>;
   setBookings: React.Dispatch<React.SetStateAction<Booking[]>>;
   setWallets: React.Dispatch<React.SetStateAction<Wallet[]>>;
   setTransactions: React.Dispatch<React.SetStateAction<Transaction[]>>;
+  setAuditLogs: React.Dispatch<React.SetStateAction<AuditLog[]>>;
 }
 
 const ShuttleContext = createContext<ShuttleContextType | undefined>(undefined);
@@ -36,10 +46,45 @@ export const ShuttleProvider = ({ children }: { children: ReactNode }) => {
   const [routePoints, setRoutePoints] = useState<RoutePoint[]>(dummyRoutePoints);
   const [schedules, setSchedules] = useState<Schedule[]>(dummySchedules);
   const [drivers, setDrivers] = useState<Driver[]>(dummyDrivers);
+  const [customers, setCustomers] = useState<User[]>(dummyCustomers);
   const [vehicles, setVehicles] = useState<Vehicle[]>(dummyVehicles);
   const [bookings, setBookings] = useState<Booking[]>(dummyBookings);
   const [wallets, setWallets] = useState<Wallet[]>(dummyWallets);
   const [transactions, setTransactions] = useState<Transaction[]>(dummyTransactions);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [systemConfig, setSystemConfig] = useState<SystemConfig>({
+    minWithdrawal: 50000,
+    maxWithdrawal: 10000000,
+    serviceFee: 2500,
+    maintenanceMode: false,
+  });
+  const [mapLayer, setMapLayerState] = useState<MapLayerType>(() => {
+    const saved = localStorage.getItem('ridewise_map_layer');
+    return (saved as MapLayerType) || 'osm';
+  });
+
+  const setMapLayer = (layer: MapLayerType) => {
+    setMapLayerState(layer);
+    localStorage.setItem('ridewise_map_layer', layer);
+  };
+
+  const addAuditLog = (action: string, details: string) => {
+    if (!currentUser) return;
+    const newLog: AuditLog = {
+      id: `audit-${Date.now()}`,
+      userId: currentUser.id,
+      userName: currentUser.name,
+      action,
+      details,
+      timestamp: new Date().toISOString(),
+    };
+    setAuditLogs(prev => [newLog, ...prev]);
+  };
+
+  const updateSystemConfig = (config: Partial<SystemConfig>) => {
+    setSystemConfig(prev => ({ ...prev, ...config }));
+    addAuditLog('Update System Config', JSON.stringify(config));
+  };
 
   const login = (email: string, _password: string, role: UserRole): boolean => {
     if (role === 'customer') {
@@ -114,6 +159,8 @@ export const ShuttleProvider = ({ children }: { children: ReactNode }) => {
     setTransactions(prev => [...prev, newTransaction]);
     setWallets(prev => prev.map(w => w.driverId === currentUser.id ? { ...w, balance: w.balance - amount } : w));
 
+    addAuditLog('Withdrawal Request', `Driver ${currentUser.name} requested withdrawal of ${amount} to ${bankName} (${accountNumber})`);
+
     return { success: true, message: 'Permintaan penarikan berhasil diajukan', transactionId };
   };
 
@@ -121,12 +168,20 @@ export const ShuttleProvider = ({ children }: { children: ReactNode }) => {
     setSchedules(prev => prev.map(s => s.id === scheduleId ? { ...s, status } : s));
   };
 
+  const updateRoutePoints = (routeId: string, points: RoutePoint[]) => {
+    setRoutePoints(prev => {
+      const filtered = prev.filter(p => p.routeId !== routeId);
+      return [...filtered, ...points].sort((a, b) => a.order - b.order);
+    });
+    addAuditLog('Update Route Points', `Updated points for route ID ${routeId}`);
+  };
+
   return (
     <ShuttleContext.Provider value={{
       currentUser, login, logout,
-      routes, routePoints, schedules, drivers, vehicles, bookings, wallets, transactions,
-      addBooking, addTransaction, withdrawBalance, updateScheduleStatus,
-      setRoutes, setRoutePoints, setSchedules, setDrivers, setVehicles, setBookings, setWallets, setTransactions,
+      routes, routePoints, schedules, drivers, customers, vehicles, bookings, wallets, transactions, auditLogs, systemConfig, mapLayer,
+      addBooking, addTransaction, addAuditLog, updateSystemConfig, setMapLayer, withdrawBalance, updateScheduleStatus, updateRoutePoints,
+      setRoutes, setRoutePoints, setSchedules, setDrivers, setCustomers, setVehicles, setBookings, setWallets, setTransactions, setAuditLogs,
     }}>
       {children}
     </ShuttleContext.Provider>

@@ -4,7 +4,7 @@ import { useShuttle } from '@/contexts/ShuttleContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { ArrowLeft, User, MapPin, QrCode } from 'lucide-react';
 import { generateSeats } from '@/data/dummy';
@@ -132,6 +132,9 @@ const DriverTripDetail = () => {
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><QrCode className="h-5 w-5" /> Scan QR Tiket</DialogTitle>
+            <DialogDescription>
+              Arahkan kamera ke QR code tiket atau masukkan ID tiket secara manual.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="bg-muted rounded-lg p-8 text-center">

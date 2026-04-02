@@ -36,10 +36,13 @@ import AdminRoutes from "./pages/admin/AdminRoutes";
 import AdminPoints from "./pages/admin/AdminPoints";
 import AdminSchedules from "./pages/admin/AdminSchedules";
 import AdminDrivers from "./pages/admin/AdminDrivers";
+import AdminUsers from "./pages/admin/AdminUsers";
 import AdminVehicles from "./pages/admin/AdminVehicles";
 import AdminAssign from "./pages/admin/AdminAssign";
 import AdminBookings from "./pages/admin/AdminBookings";
 import AdminReports from "./pages/admin/AdminReports";
+import AdminAudit from "./pages/admin/AdminAudit";
+import AdminMonitoring from "./pages/admin/AdminMonitoring";
 import AdminTracking from "./pages/admin/AdminTracking";
 import AdminAnalytics from "./pages/admin/AdminAnalytics";
 import AdminPaymentSettings from "./pages/admin/AdminPaymentSettings";
@@ -94,10 +97,13 @@ const App = () => (
                 <Route path="points" element={<AdminPoints />} />
                 <Route path="schedules" element={<AdminSchedules />} />
                 <Route path="drivers" element={<AdminDrivers />} />
+                <Route path="users" element={<AdminUsers />} />
                 <Route path="vehicles" element={<AdminVehicles />} />
                 <Route path="assign" element={<AdminAssign />} />
                 <Route path="bookings" element={<AdminBookings />} />
                 <Route path="reports" element={<AdminReports />} />
+                <Route path="audit" element={<AdminAudit />} />
+                <Route path="monitoring" element={<AdminMonitoring />} />
                 <Route path="tracking" element={<AdminTracking />} />
                 <Route path="analytics" element={<AdminAnalytics />} />
                 <Route path="payment-settings" element={<AdminPaymentSettings />} />

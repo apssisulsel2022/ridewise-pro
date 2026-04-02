@@ -45,6 +45,9 @@ export interface RoutePoint {
   order: number;
   lat: number;
   lng: number;
+  address?: string;
+  notes?: string;
+  imageUrl?: string;
 }
 
 export interface Schedule {
@@ -126,6 +129,23 @@ export interface Wallet {
   balance: number;
 }
 
+export interface AuditLog {
+  id: string;
+  userId: string;
+  userName: string;
+  action: string;
+  details: string;
+  timestamp: string;
+  ipAddress?: string;
+}
+
+export interface SystemConfig {
+  minWithdrawal: number;
+  maxWithdrawal: number;
+  serviceFee: number;
+  maintenanceMode: boolean;
+}
+
 export interface Transaction {
   id: string;
   driverId: string;
@@ -136,4 +156,12 @@ export interface Transaction {
   bankName?: string;
   accountNumber?: string;
   reference?: string;
+}
+
+export type MapLayerType = 'osm' | 'satellite' | 'terrain' | 'dark';
+
+export interface MapConfig {
+  layer: MapLayerType;
+  zoom: number;
+  center: [number, number];
 }

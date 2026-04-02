@@ -4,30 +4,76 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { MapController, MAP_LAYERS } from '@/components/map/MapController';
+import { Loader2, AlertCircle } from 'lucide-react';
 
 const AdminTracking = () => {
-  const { schedules, routes, drivers, routePoints } = useShuttle();
+  const { schedules, routes, drivers, routePoints, mapLayer } = useShuttle();
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<L.Map | null>(null);
+  const tileLayerRef = useRef<L.TileLayer | null>(null);
   const [selectedDriver, setSelectedDriver] = useState<string | null>(null);
+  const [isMapLoading, setIsMapLoading] = useState(false);
+  const [mapError, setMapError] = useState<string | null>(null);
 
   const activeSchedules = schedules.filter(s => s.driverId && (s.status === 'departed' || s.status === 'boarding'));
 
   useEffect(() => {
     if (!mapRef.current || mapInstance.current) return;
 
-    const map = L.map(mapRef.current).setView([3.5952, 98.6722], 9);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap'
-    }).addTo(map);
+    try {
+      setIsMapLoading(true);
+      const map = L.map(mapRef.current).setView([3.5952, 98.6722], 9);
+      
+      const layerConfig = MAP_LAYERS[mapLayer];
+      const tileLayer = L.tileLayer(layerConfig.url, {
+        attribution: layerConfig.attribution
+      }).addTo(map);
 
-    mapInstance.current = map;
+      tileLayer.on('loading', () => setIsMapLoading(true));
+      tileLayer.on('load', () => {
+        setIsMapLoading(false);
+        setMapError(null);
+      });
+      tileLayer.on('tileerror', () => {
+        setIsMapLoading(false);
+        setMapError('Gagal memuat beberapa ubin peta. Periksa koneksi internet Anda.');
+      });
+
+      mapInstance.current = map;
+      tileLayerRef.current = tileLayer;
+    } catch (err) {
+      console.error('Error initializing map:', err);
+      setMapError('Terjadi kesalahan saat menginisialisasi peta.');
+      setIsMapLoading(false);
+    }
 
     return () => {
-      map.remove();
-      mapInstance.current = null;
+      if (mapInstance.current) {
+        mapInstance.current.remove();
+        mapInstance.current = null;
+      }
     };
   }, []);
+
+  // Effect to update tile layer when mapLayer preference changes
+  useEffect(() => {
+    if (!mapInstance.current || !tileLayerRef.current) return;
+
+    const layerConfig = MAP_LAYERS[mapLayer];
+    
+    // Update the URL and attribution of the existing tile layer
+    tileLayerRef.current.setUrl(layerConfig.url);
+    tileLayerRef.current.options.attribution = layerConfig.attribution;
+    
+    // Refresh the attribution control
+    mapInstance.current.attributionControl.removeAttribution(tileLayerRef.current.options.attribution);
+    mapInstance.current.attributionControl.addAttribution(layerConfig.attribution);
+
+    // Track loading for the new layer
+    setIsMapLoading(true);
+    tileLayerRef.current.once('load', () => setIsMapLoading(false));
+  }, [mapLayer]);
 
   useEffect(() => {
     if (!mapInstance.current) return;
@@ -88,8 +134,23 @@ const AdminTracking = () => {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         <div className="lg:col-span-3">
           <Card>
-            <CardContent className="p-0">
+            <CardContent className="p-0 relative">
               <div ref={mapRef} className="h-[500px] rounded-lg" />
+              <MapController />
+              
+              {isMapLoading && (
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1001] bg-white/80 backdrop-blur-sm p-3 rounded-full shadow-lg flex items-center gap-2">
+                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                  <span className="text-xs font-medium">Memuat Peta...</span>
+                </div>
+              )}
+
+              {mapError && (
+                <div className="absolute bottom-4 left-4 z-[1001] bg-destructive/10 border border-destructive/20 text-destructive text-xs p-3 rounded-lg flex items-center gap-2 max-w-[250px] shadow-sm">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>{mapError}</span>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

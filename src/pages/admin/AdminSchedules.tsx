@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2 } from 'lucide-react';
@@ -31,7 +31,12 @@ const AdminSchedules = () => {
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-1" />Tambah</Button></DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>Tambah Jadwal</DialogTitle></DialogHeader>
+            <DialogHeader>
+              <DialogTitle>Tambah Jadwal</DialogTitle>
+              <DialogDescription>
+                Tentukan rute, jam keberangkatan, dan armada untuk jadwal baru.
+              </DialogDescription>
+            </DialogHeader>
             <div className="space-y-3">
               <div><Label>Rute</Label>
                 <Select value={form.routeId} onValueChange={v => setForm({...form, routeId: v})}>
