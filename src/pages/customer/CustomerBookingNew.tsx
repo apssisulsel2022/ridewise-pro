@@ -14,7 +14,7 @@ import { PaymentMethod } from '@/types/shuttle';
 const CustomerBookingNew = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { routes, routePoints, schedules, vehicles, bookings, addBooking, currentUser } = useShuttle();
+  const { routes, routePoints, schedules, vehicles, bookings, addBooking, setBookings, currentUser } = useShuttle();
 
   const scheduleId = searchParams.get('scheduleId') || '';
   const routeId = searchParams.get('routeId') || '';
