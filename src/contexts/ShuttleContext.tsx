@@ -22,6 +22,7 @@ interface ShuttleContextType {
   systemConfig: SystemConfig;
   mapLayer: MapLayerType;
   addBooking: (booking: Booking) => void;
+  acceptBooking: (bookingId: string) => void;
   addTransaction: (transaction: Transaction) => void;
   addAuditLog: (action: string, details: string) => void;
   addFavorite: (favorite: Omit<FavoriteLocation, 'id' | 'userId'>) => void;
@@ -164,6 +165,21 @@ export const ShuttleProvider = ({ children }: { children: ReactNode }) => {
     addPickupHistory({ pointId: booking.pickupPointId, pointName: booking.pickupPointName });
   };
 
+  const acceptBooking = (bookingId: string) => {
+    const booking = bookings.find((b) => b.id === bookingId);
+    if (!booking) return;
+
+    setBookings(prev => prev.map((b) => b.id === bookingId ? { ...b, status: 'confirmed' } : b));
+
+    const schedule = schedules.find((s) => s.id === booking.scheduleId);
+    if (schedule && !schedule.driverId && currentUser && currentUser.role === 'driver') {
+      setSchedules(prev => prev.map((s) => s.id === schedule.id ? { ...s, driverId: currentUser.id } : s));
+      addAuditLog('Accept Booking', `Driver ${currentUser.name} accepted order ${booking.id} and assigned schedule ${schedule.id}`);
+    } else {
+      addAuditLog('Accept Booking', `Driver ${currentUser?.name} accepted order ${booking.id}`);
+    }
+  };
+
   const addFavorite = (favorite: Omit<FavoriteLocation, 'id' | 'userId'>) => {
     if (!currentUser) return;
     const newFavorite: FavoriteLocation = {
@@ -276,7 +292,7 @@ export const ShuttleProvider = ({ children }: { children: ReactNode }) => {
     <ShuttleContext.Provider value={{
       currentUser, login, logout,
       rayons, routes, routePoints, schedules, drivers, customers, vehicles, bookings, wallets, transactions, auditLogs, favorites, pickupHistory, systemConfig, mapLayer,
-      addBooking, addTransaction, addAuditLog, addFavorite, removeFavorite, addPickupHistory, updateSystemConfig, setMapLayer, withdrawBalance, updateScheduleStatus, updateScheduleAssignment, updateRoutePoints,
+      addBooking, acceptBooking, addTransaction, addAuditLog, addFavorite, removeFavorite, addPickupHistory, updateSystemConfig, setMapLayer, withdrawBalance, updateScheduleStatus, updateScheduleAssignment, updateRoutePoints,
       setRayons, setRoutes, setRoutePoints, setSchedules, setDrivers, setCustomers, setVehicles, setBookings, setWallets, setTransactions, setAuditLogs,
     }}>
       {children}

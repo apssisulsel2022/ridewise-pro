@@ -115,7 +115,7 @@ export interface Booking {
   pickupPointName: string;
   seatNumber: number;
   price: number;
-  status: 'confirmed' | 'completed' | 'cancelled';
+  status: 'requested' | 'confirmed' | 'completed' | 'cancelled';
   bookingDate: string;
   departureTime: string;
   paymentStatus: PaymentStatus;
