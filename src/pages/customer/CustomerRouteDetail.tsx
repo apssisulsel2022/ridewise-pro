@@ -1,0 +1,84 @@
+import { useParams, useNavigate } from 'react-router-dom';
+import { useShuttle } from '@/contexts/ShuttleContext';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { ArrowLeft, MapPin, Clock, Users } from 'lucide-react';
+import { formatRupiah } from '@/data/dummy';
+
+const CustomerRouteDetail = () => {
+  const { routeId } = useParams();
+  const navigate = useNavigate();
+  const { routes, routePoints, schedules, vehicles, bookings } = useShuttle();
+
+  const route = routes.find(r => r.id === routeId);
+  const points = routePoints.filter(p => p.routeId === routeId).sort((a, b) => a.order - b.order);
+  const availableSchedules = schedules.filter(s => s.routeId === routeId && (s.status === 'scheduled' || s.status === 'boarding'));
+
+  if (!route) return <div className="p-4">Rute tidak ditemukan</div>;
+
+  const getAvailableSeats = (scheduleId: string, vehicleId: string) => {
+    const vehicle = vehicles.find(v => v.id === vehicleId);
+    const booked = bookings.filter(b => b.scheduleId === scheduleId && b.status !== 'cancelled').length;
+    return (vehicle?.capacity || 0) - booked;
+  };
+
+  return (
+    <div className="p-4 space-y-4">
+      <Button variant="ghost" size="sm" onClick={() => navigate('/customer')} className="mb-2">
+        <ArrowLeft className="h-4 w-4 mr-1" /> Kembali
+      </Button>
+
+      <div className="bg-primary text-primary-foreground rounded-xl p-4">
+        <h2 className="text-xl font-bold">{route.name}</h2>
+        <p className="text-sm opacity-80">{(route.distanceMeters / 1000).toFixed(0)} km · {formatRupiah(route.price)}</p>
+      </div>
+
+      {/* Pickup Points */}
+      <div>
+        <h3 className="font-semibold mb-2 flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" /> Titik Penjemputan</h3>
+        <div className="flex gap-2 flex-wrap">
+          {points.map(p => (
+            <Badge key={p.id} variant="outline" className="px-3 py-1.5">{p.code} — {p.name}</Badge>
+          ))}
+        </div>
+      </div>
+
+      {/* Schedules */}
+      <div>
+        <h3 className="font-semibold mb-2 flex items-center gap-2"><Clock className="h-4 w-4 text-primary" /> Jadwal Tersedia</h3>
+        {availableSchedules.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Tidak ada jadwal tersedia</p>
+        ) : (
+          <div className="space-y-2">
+            {availableSchedules.map(schedule => {
+              const available = getAvailableSeats(schedule.id, schedule.vehicleId);
+              const vehicle = vehicles.find(v => v.id === schedule.vehicleId);
+              return (
+                <Card key={schedule.id} className="cursor-pointer hover:border-primary transition-all" onClick={() => navigate(`/customer/booking/new?scheduleId=${schedule.id}&routeId=${routeId}`)}>
+                  <CardContent className="p-4 flex items-center justify-between">
+                    <div>
+                      <p className="font-semibold text-lg">{schedule.departureTime}</p>
+                      <p className="text-xs text-muted-foreground">{vehicle?.name} · {vehicle?.plateNumber}</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="flex items-center gap-1 text-sm">
+                        <Users className="h-4 w-4" />
+                        <span className={available <= 2 ? 'text-destructive font-medium' : 'text-success font-medium'}>{available} kursi</span>
+                      </div>
+                      <Badge variant={schedule.status === 'boarding' ? 'default' : 'secondary'} className="text-xs mt-1">
+                        {schedule.status === 'boarding' ? 'Boarding' : 'Terjadwal'}
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default CustomerRouteDetail;
