@@ -1,11 +1,14 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, MapPin, Navigation, CalendarDays, Users, Bus, Link2, BookOpen, FileText, LogOut } from 'lucide-react';
+import { LayoutDashboard, MapPin, Navigation, CalendarDays, Users, Bus, Link2, BookOpen, FileText, LogOut, Map, BarChart3, CreditCard } from 'lucide-react';
 import { useShuttle } from '@/contexts/ShuttleContext';
+import { NotificationCenter } from '@/components/NotificationCenter';
 import { SidebarProvider, Sidebar, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger } from '@/components/ui/sidebar';
 import { NavLink } from '@/components/NavLink';
 
 const menuItems = [
   { title: 'Dashboard', url: '/admin', icon: LayoutDashboard },
+  { title: 'Analytics', url: '/admin/analytics', icon: BarChart3 },
+  { title: 'Tracking', url: '/admin/tracking', icon: Map },
   { title: 'Rute', url: '/admin/routes', icon: Navigation },
   { title: 'Titik Jemput', url: '/admin/points', icon: MapPin },
   { title: 'Jadwal', url: '/admin/schedules', icon: CalendarDays },
@@ -14,6 +17,7 @@ const menuItems = [
   { title: 'Assign Driver', url: '/admin/assign', icon: Link2 },
   { title: 'Booking', url: '/admin/bookings', icon: BookOpen },
   { title: 'Laporan', url: '/admin/reports', icon: FileText },
+  { title: 'Payment', url: '/admin/payment-settings', icon: CreditCard },
 ];
 
 const AdminSidebar = () => {
@@ -57,6 +61,7 @@ const AdminLayout = () => {
               <span className="font-semibold text-lg">Admin Panel</span>
             </div>
             <div className="flex items-center gap-3">
+              <NotificationCenter role="admin" />
               <span className="text-sm text-muted-foreground">{currentUser?.name}</span>
               <button onClick={() => { logout(); navigate('/'); }} className="p-2 rounded-lg hover:bg-muted text-muted-foreground">
                 <LogOut className="h-4 w-4" />

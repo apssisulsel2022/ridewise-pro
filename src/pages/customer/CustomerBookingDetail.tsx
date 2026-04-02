@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, CheckCircle, MapPin, Clock, Armchair } from 'lucide-react';
 import { formatRupiah } from '@/data/dummy';
+import { ETicket } from '@/components/ETicket';
 
 const CustomerBookingDetail = () => {
   const { bookingId } = useParams();
@@ -38,50 +39,13 @@ const CustomerBookingDetail = () => {
         <Badge className={statusColor[booking.status]}>{statusLabel[booking.status]}</Badge>
       </div>
 
-      <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">ID Booking</CardTitle></CardHeader>
-        <CardContent><p className="font-mono text-sm">{booking.id}</p></CardContent>
-      </Card>
+      {/* E-Ticket */}
+      <ETicket booking={booking} />
 
-      <Card>
-        <CardContent className="p-4 space-y-3">
-          <div className="flex items-center gap-3">
-            <MapPin className="h-5 w-5 text-primary" />
-            <div>
-              <p className="text-xs text-muted-foreground">Rute</p>
-              <p className="font-medium">{booking.routeName}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <MapPin className="h-5 w-5 text-secondary" />
-            <div>
-              <p className="text-xs text-muted-foreground">Titik Jemput</p>
-              <p className="font-medium">{booking.pickupPointName}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Clock className="h-5 w-5 text-primary" />
-            <div>
-              <p className="text-xs text-muted-foreground">Waktu Keberangkatan</p>
-              <p className="font-medium">{booking.departureTime} · {booking.bookingDate}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Armchair className="h-5 w-5 text-primary" />
-            <div>
-              <p className="text-xs text-muted-foreground">Nomor Kursi</p>
-              <p className="font-medium text-xl">#{booking.seatNumber}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-primary/5 border-primary/20">
-        <CardContent className="p-4 text-center">
-          <p className="text-sm text-muted-foreground">Total Harga</p>
-          <p className="text-3xl font-bold text-primary">{formatRupiah(booking.price)}</p>
-        </CardContent>
-      </Card>
+      {/* Print button */}
+      <Button variant="outline" className="w-full" onClick={() => window.print()}>
+        📥 Download / Print Tiket
+      </Button>
     </div>
   );
 };

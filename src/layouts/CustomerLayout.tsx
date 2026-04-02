@@ -1,6 +1,7 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Home, Clock, Ticket, User, LogOut } from 'lucide-react';
 import { useShuttle } from '@/contexts/ShuttleContext';
+import { NotificationCenter } from '@/components/NotificationCenter';
 
 const CustomerLayout = () => {
   const navigate = useNavigate();
@@ -20,9 +21,12 @@ const CustomerLayout = () => {
     <div className="min-h-screen bg-background flex flex-col max-w-md mx-auto">
       <header className="bg-primary text-primary-foreground p-4 flex items-center justify-between sticky top-0 z-10">
         <h1 className="text-lg font-bold">🚐 ShuttleKu</h1>
-        <button onClick={() => { logout(); navigate('/'); }} className="p-2 rounded-lg hover:bg-primary/80">
-          <LogOut className="h-5 w-5" />
-        </button>
+        <div className="flex items-center gap-1">
+          <NotificationCenter role="customer" variant="light" />
+          <button onClick={() => { logout(); navigate('/'); }} className="p-2 rounded-lg hover:bg-primary/80">
+            <LogOut className="h-5 w-5" />
+          </button>
+        </div>
       </header>
 
       <main className="flex-1 overflow-y-auto pb-20">

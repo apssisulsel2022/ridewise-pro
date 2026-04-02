@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useShuttle } from '@/contexts/ShuttleContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, User, MapPin } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { ArrowLeft, User, MapPin, QrCode } from 'lucide-react';
 import { generateSeats } from '@/data/dummy';
 import { toast } from 'sonner';
 
@@ -11,6 +14,8 @@ const DriverTripDetail = () => {
   const { scheduleId } = useParams();
   const navigate = useNavigate();
   const { schedules, routes, vehicles, bookings, updateScheduleStatus } = useShuttle();
+  const [scanOpen, setScanOpen] = useState(false);
+  const [scanInput, setScanInput] = useState('');
 
   const schedule = schedules.find(s => s.id === scheduleId);
   const route = routes.find(r => r.id === schedule?.routeId);
@@ -31,6 +36,19 @@ const DriverTripDetail = () => {
   const handleFinish = () => {
     updateScheduleStatus(schedule.id, 'arrived');
     toast.success('Perjalanan selesai!');
+  };
+
+  const handleScan = () => {
+    const found = bookings.find(b => b.id === scanInput.trim());
+    if (found && found.scheduleId === scheduleId) {
+      toast.success(`✅ Valid! Penumpang: ${found.userName}, Kursi #${found.seatNumber}`);
+    } else if (found) {
+      toast.error('❌ Tiket valid tapi bukan untuk perjalanan ini');
+    } else {
+      toast.error('❌ Tiket tidak ditemukan');
+    }
+    setScanInput('');
+    setScanOpen(false);
   };
 
   return (
@@ -60,6 +78,11 @@ const DriverTripDetail = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Scan QR */}
+      <Button variant="outline" className="w-full" onClick={() => setScanOpen(true)}>
+        <QrCode className="h-4 w-4 mr-2" /> Scan QR Tiket
+      </Button>
 
       {/* Seat Map */}
       <Card>
@@ -103,6 +126,33 @@ const DriverTripDetail = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Scan QR Dialog */}
+      <Dialog open={scanOpen} onOpenChange={setScanOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><QrCode className="h-5 w-5" /> Scan QR Tiket</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="bg-muted rounded-lg p-8 text-center">
+              <QrCode className="h-16 w-16 text-muted-foreground mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">Kamera QR (Simulasi)</p>
+            </div>
+            <div>
+              <p className="text-sm mb-2">Atau masukkan ID Booking manual:</p>
+              <Input
+                placeholder="Contoh: b1"
+                value={scanInput}
+                onChange={e => setScanInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleScan()}
+              />
+            </div>
+            <Button className="w-full" onClick={handleScan} disabled={!scanInput.trim()}>
+              Validasi Tiket
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
