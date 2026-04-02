@@ -18,9 +18,6 @@ const adminMenuItems = [
   { title: 'Assign Driver', url: '/admin/assign', icon: Link2 },
   { title: 'Booking', url: '/admin/bookings', icon: BookOpen },
   { title: 'Laporan', url: '/admin/reports', icon: FileText },
-  { title: 'Audit Trail', url: '/admin/audit', icon: Activity },
-  { title: 'Monitoring', url: '/admin/monitoring', icon: Zap },
-  { title: 'Payment', url: '/admin/payment-settings', icon: CreditCard },
 ];
 
 const superAdminMenuItems = [
@@ -30,6 +27,7 @@ const superAdminMenuItems = [
   { title: 'Monitoring Global', url: '/superadmin/monitoring', icon: Zap },
   { title: 'Analytics Global', url: '/superadmin/analytics', icon: BarChart3 },
   { title: 'Audit Trail Global', url: '/superadmin/audit', icon: Activity },
+  { title: 'Payment Settings', url: '/superadmin/payment-settings', icon: CreditCard },
 ];
 
 const AdminSidebar = ({ role }: { role: string }) => {

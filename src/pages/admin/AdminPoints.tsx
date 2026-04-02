@@ -8,7 +8,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { MapContainer, TileLayer, CircleMarker } from 'react-leaflet';
 import { Plus, Trash2, Edit, Eye, MapPin, Loader2, Download, FileText, Search, Filter } from 'lucide-react';
+import { MAP_LAYERS } from '@/components/map/MapController';
 import { toast } from 'sonner';
 import { RoutePoint } from '@/types/shuttle';
 import { PointEditDialog } from '@/components/admin/PointEditDialog';
@@ -48,13 +50,29 @@ const AdminPoints = () => {
   const [detailOpen, setDetailOpen] = useState(false);
 
   useEffect(() => {
-    if (form.routeId && !form.rayonId) {
-      const route = routes.find((r) => r.id === form.routeId);
-      if (route) {
-        setForm((prev) => ({ ...prev, rayonId: route.rayonId }));
-      }
+    if (!form.routeId) {
+      setForm((prev) => ({ ...prev, rayonId: '' }));
+      return;
+    }
+
+    const route = routes.find((r) => r.id === form.routeId);
+    if (route && form.rayonId !== route.rayonId) {
+      setForm((prev) => ({ ...prev, rayonId: route.rayonId }));
     }
   }, [form.routeId, form.rayonId, routes]);
+
+  useEffect(() => {
+    if (!open || routes.length === 0) return;
+    if (!form.routeId) {
+      const defaultRoute = routes[0];
+      setForm((prev) => ({
+        ...prev,
+        routeId: defaultRoute.id,
+        rayonId: defaultRoute.rayonId,
+        order: routePoints.filter((p) => p.routeId === defaultRoute.id).length + 1,
+      }));
+    }
+  }, [open, routes, form.routeId, routePoints]);
 
   const filtered = useMemo(() => {
     return routePoints
@@ -179,7 +197,7 @@ const AdminPoints = () => {
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild><Button className="w-full sm:w-auto"><Plus className="h-4 w-4 mr-1" />Tambah Titik</Button></DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent className="sm:max-w-[500px] max-h-[calc(100vh-4rem)] overflow-auto">
             <DialogHeader>
               <DialogTitle>Tambah Titik Jemput</DialogTitle>
               <DialogDescription>
@@ -253,6 +271,22 @@ const AdminPoints = () => {
                   <Input type="number" step="any" value={form.lng} onChange={e => setForm({...form, lng: Number(e.target.value)})} />
                 </div>
               </div>
+
+              <Card className="border shadow-sm bg-slate-50">
+                <CardHeader className="bg-slate-100 border-b">
+                  <CardTitle className="text-sm font-semibold">Preview Lokasi Titik</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="h-[220px]">
+                    {open && (
+                      <MapContainer center={[form.lat, form.lng]} zoom={13} scrollWheelZoom={false} className="h-full w-full">
+                        <TileLayer url={MAP_LAYERS.osm.url} attribution={MAP_LAYERS.osm.attribution} />
+                        <CircleMarker center={[form.lat, form.lng]} radius={8} pathOptions={{ color: '#2563eb', fillColor: '#3b82f6', fillOpacity: 0.9 }} />
+                      </MapContainer>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
 
               <div className="space-y-2">
                 <Label>Catatan Tambahan</Label>

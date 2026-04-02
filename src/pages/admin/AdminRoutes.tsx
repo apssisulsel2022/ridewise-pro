@@ -16,7 +16,7 @@ import RouteEditorMap from '@/components/map/RouteEditorMap';
 import { cn } from '@/lib/utils';
 
 const AdminRoutes = () => {
-  const { routes, setRoutes, routePoints, updateRoutePoints, schedules, bookings, drivers, vehicles, rayons, updateScheduleAssignment } = useShuttle();
+  const { routes, setRoutes, routePoints, setRoutePoints, updateRoutePoints, schedules, bookings, drivers, vehicles, rayons, updateScheduleAssignment } = useShuttle();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Route | null>(null);
   const [selectedRouteForMap, setSelectedRouteForMap] = useState<Route | null>(null);
@@ -67,6 +67,13 @@ const AdminRoutes = () => {
     r.destination.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const routePointCount = useMemo(() => {
+    return routePoints.reduce<Record<string, number>>((acc, point) => {
+      acc[point.routeId] = (acc[point.routeId] || 0) + 1;
+      return acc;
+    }, {});
+  }, [routePoints]);
+
   const totalActiveTrips = schedules.filter(s => s.status === 'departed' || s.status === 'boarding').length;
   const totalBookings = bookings.length;
 
@@ -96,6 +103,9 @@ const AdminRoutes = () => {
     setTimeout(() => {
       if (editing) {
         setRoutes(prev => prev.map(r => r.id === editing.id ? { ...r, ...form } : r));
+        if (editing.rayonId !== form.rayonId) {
+          setRoutePoints(prev => prev.map((p) => p.routeId === editing.id ? { ...p, rayonId: form.rayonId } : p));
+        }
         toast.success('Rute diperbarui');
       } else {
         const newRoute: Route = { id: `r${Date.now()}`, ...form };
@@ -110,8 +120,9 @@ const AdminRoutes = () => {
 
   const handleDelete = (id: string) => { 
     setRoutes(prev => prev.filter(r => r.id !== id)); 
+    setRoutePoints(prev => prev.filter(p => p.routeId !== id));
     if (selectedRouteForMap?.id === id) setSelectedRouteForMap(null);
-    toast.success('Rute dihapus'); 
+    toast.success('Rute dan titik jemput terkait berhasil dihapus'); 
   };
 
   const handlePointsChange = (points: RoutePoint[], distance: number) => {
@@ -299,6 +310,7 @@ const AdminRoutes = () => {
                           Jarak <SortIcon column="distanceMeters" />
                         </div>
                       </TableHead>
+                      <TableHead className="text-center font-bold uppercase text-[11px] tracking-widest">Titik</TableHead>
                       <TableHead className="text-right font-bold uppercase text-[11px] tracking-widest">Aksi</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -348,6 +360,9 @@ const AdminRoutes = () => {
                         <TableCell className="font-mono text-xs text-muted-foreground">
                           {(r.distanceMeters / 1000).toFixed(1)} km
                         </TableCell>
+                        <TableCell className="text-center text-sm text-muted-foreground">
+                          {routePointCount[r.id] || 0}
+                        </TableCell>
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <Button variant="ghost" size="icon" className="h-9 w-9 hover:bg-primary/10 hover:text-primary transition-colors" onClick={() => openEdit(r)}>
@@ -362,7 +377,7 @@ const AdminRoutes = () => {
                     ))}
                     {filteredRoutes.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={4} className="py-20">
+                        <TableCell colSpan={5} className="py-20">
                           <div className="flex flex-col items-center justify-center text-center space-y-4 animate-in fade-in zoom-in duration-300">
                             <div className="p-4 bg-muted/50 rounded-full">
                               <PackageOpen className="h-12 w-12 text-muted-foreground/40" />

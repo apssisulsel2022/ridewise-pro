@@ -42,7 +42,6 @@ import AdminAssign from "./pages/admin/AdminAssign";
 import AdminBookings from "./pages/admin/AdminBookings";
 import AdminReports from "./pages/admin/AdminReports";
 import AdminAudit from "./pages/admin/AdminAudit";
-import AdminMonitoring from "./pages/admin/AdminMonitoring";
 import AdminTracking from "./pages/admin/AdminTracking";
 import AdminAnalytics from "./pages/admin/AdminAnalytics";
 import AdminPaymentSettings from "./pages/admin/AdminPaymentSettings";
@@ -107,11 +106,8 @@ const App = () => (
                 <Route path="assign" element={<AdminAssign />} />
                 <Route path="bookings" element={<AdminBookings />} />
                 <Route path="reports" element={<AdminReports />} />
-                <Route path="audit" element={<AdminAudit />} />
-                <Route path="monitoring" element={<AdminMonitoring />} />
                 <Route path="tracking" element={<AdminTracking />} />
                 <Route path="analytics" element={<AdminAnalytics />} />
-                <Route path="payment-settings" element={<AdminPaymentSettings />} />
               </Route>
 
               {/* Super Admin */}
@@ -120,6 +116,7 @@ const App = () => (
                 <Route path="admins" element={<AdminManagement />} />
                 <Route path="business-config" element={<BusinessConfig />} />
                 <Route path="monitoring" element={<GlobalMonitoring />} />
+                <Route path="payment-settings" element={<AdminPaymentSettings />} />
                 <Route path="routes" element={<AdminRoutes />} />
                 <Route path="schedules" element={<AdminSchedules />} />
                 <Route path="drivers" element={<AdminDrivers />} />
