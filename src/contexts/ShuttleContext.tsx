@@ -1,159 +1,146 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { User, UserRole, Booking, Schedule, Route, RoutePoint, Driver, Vehicle, Wallet, Transaction, AuditLog, SystemConfig, MapLayerType, FavoriteLocation, PickupHistory, Rayon } from '@/types/shuttle';
-import { dummyRoutes, dummyRoutePoints, dummySchedules, dummyDrivers, dummyVehicles, dummyBookings, dummyWallets, dummyTransactions, dummyCustomers, dummyRayons } from '@/data/dummy';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { User, UserRole, Booking, Schedule, Route, RoutePoint, Driver, Vehicle, RayonPricing, RideRequest, Discount, TaxConfig, PricingAuditLog, DriverLocation, TrackingLog, Ticket, TicketStatus, TicketComment, DriverRegistration, VerificationStatus, VerificationLog } from '@/types/shuttle';
+import { dummyRoutes, dummyRoutePoints, dummySchedules, dummyDrivers, dummyVehicles, dummyBookings, defaultRayonPricing, dummyDiscounts, defaultTaxConfigs, dummyTickets, dummyRegistrations } from '@/data/dummy';
+import { calculateHaversineDistance, isValidRouteData } from '@/lib/utils';
+import { calculateFinalPrice } from '@/lib/pricing';
+import { processBookingOnServer, BookingRequest, BookingResponse } from '@/services/bookingServer';
+import { useNotifications } from './NotificationContext';
+import { toast } from 'sonner';
 
 interface ShuttleContextType {
   currentUser: User | null;
   login: (email: string, password: string, role: UserRole) => boolean;
   logout: () => void;
-  rayons: Rayon[];
   routes: Route[];
   routePoints: RoutePoint[];
   schedules: Schedule[];
   drivers: Driver[];
-  customers: User[];
   vehicles: Vehicle[];
   bookings: Booking[];
-  wallets: Wallet[];
-  transactions: Transaction[];
-  auditLogs: AuditLog[];
-  favorites: FavoriteLocation[];
-  pickupHistory: PickupHistory[];
-  systemConfig: SystemConfig;
-  mapLayer: MapLayerType;
+  rayonPricing: RayonPricing[];
+  rideRequests: RideRequest[];
+  discounts: Discount[];
+  taxConfigs: TaxConfig[];
+  auditLogs: PricingAuditLog[];
+  driverLocations: Record<string, DriverLocation>;
+  trackingLogs: TrackingLog[];
+  tickets: Ticket[];
+  registrations: DriverRegistration[];
+  updateDriverLocation: (driverId: string, location: DriverLocation) => void;
+  addAuditLog: (log: Omit<PricingAuditLog, 'id' | 'changeDate'>) => void;
+  createSecureBooking: (request: BookingRequest) => BookingResponse;
   addBooking: (booking: Booking) => void;
-  acceptBooking: (bookingId: string) => void;
-  addTransaction: (transaction: Transaction) => void;
-  addAuditLog: (action: string, details: string) => void;
-  addFavorite: (favorite: Omit<FavoriteLocation, 'id' | 'userId'>) => void;
-  removeFavorite: (id: string) => void;
-  addPickupHistory: (point: { pointId: string; pointName: string }) => void;
-  updateSystemConfig: (config: Partial<SystemConfig>) => void;
-  setMapLayer: (layer: MapLayerType) => void;
-  withdrawBalance: (amount: number, bankName: string, accountNumber: string) => Promise<{ success: boolean; message: string; transactionId?: string }>;
   updateScheduleStatus: (scheduleId: string, status: Schedule['status']) => void;
-  updateRoutePoints: (routeId: string, points: RoutePoint[]) => void;
-  updateScheduleAssignment: (scheduleId: string, updates: Partial<Pick<Schedule, 'vehicleId' | 'driverId' | 'status'>>) => void;
-  setRayons: React.Dispatch<React.SetStateAction<Rayon[]>>;
+  addRideRequest: (request: RideRequest) => void;
+  acceptRideRequest: (requestId: string) => void;
+  rejectRideRequest: (requestId: string) => void;
+  checkInPassenger: (bookingId: string) => void;
+  updateTicketStatus: (ticketId: string, status: TicketStatus, note?: string) => void;
+  addTicketComment: (ticketId: string, message: string, attachments?: string[]) => void;
+  submitDriverRegistration: (registration: Omit<Driver, 'id' | 'verificationStatus' | 'submittedAt' | 'updatedAt' | 'logs' | 'status' | 'rating' | 'totalTrips' | 'joinDate'>) => void;
+  updateRegistrationStatus: (registrationId: string, status: VerificationStatus, reason?: string) => void;
   setRoutes: React.Dispatch<React.SetStateAction<Route[]>>;
   setRoutePoints: React.Dispatch<React.SetStateAction<RoutePoint[]>>;
   setSchedules: React.Dispatch<React.SetStateAction<Schedule[]>>;
   setDrivers: React.Dispatch<React.SetStateAction<Driver[]>>;
-  setCustomers: React.Dispatch<React.SetStateAction<User[]>>;
   setVehicles: React.Dispatch<React.SetStateAction<Vehicle[]>>;
   setBookings: React.Dispatch<React.SetStateAction<Booking[]>>;
-  setWallets: React.Dispatch<React.SetStateAction<Wallet[]>>;
-  setTransactions: React.Dispatch<React.SetStateAction<Transaction[]>>;
-  setAuditLogs: React.Dispatch<React.SetStateAction<AuditLog[]>>;
+  setRayonPricing: React.Dispatch<React.SetStateAction<RayonPricing[]>>;
+  setDiscounts: React.Dispatch<React.SetStateAction<Discount[]>>;
+  setTaxConfigs: React.Dispatch<React.SetStateAction<TaxConfig[]>>;
+  updateDriverStatus: (driverId: string, status: 'online' | 'offline') => Promise<boolean>;
+  assignDriverToSchedule: (scheduleId: string, driverId: string) => void;
+  removeDriverFromSchedule: (scheduleId: string) => void;
+  updateTripStatus: (scheduleId: string, status: Schedule['status'], notes?: string) => void;
+  notifyBookingCreated: (booking: Booking) => void;
+  notifyTripUpdate: (scheduleId: string, status: Schedule['status']) => void;
+  getAvailableDrivers: (date: string, timeSlot?: string) => Driver[];
+  getDriverSchedule: (driverId: string, date?: string) => Schedule[];
 }
 
 const ShuttleContext = createContext<ShuttleContextType | undefined>(undefined);
 
 export const ShuttleProvider = ({ children }: { children: ReactNode }) => {
+  const { addNotification } = useNotifications();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [rayons, setRayons] = useState<Rayon[]>(dummyRayons);
   const [routes, setRoutes] = useState<Route[]>(dummyRoutes);
   const [routePoints, setRoutePoints] = useState<RoutePoint[]>(dummyRoutePoints);
   const [schedules, setSchedules] = useState<Schedule[]>(dummySchedules);
-  const [drivers, setDrivers] = useState<Driver[]>(dummyDrivers.map(d => ({
-    ...d,
-    status: 'active' as const,
-    rating: 4.8,
-    totalTrips: Math.floor(Math.random() * 100),
-    walletBalance: Math.floor(Math.random() * 1000000),
-  })));
-  const [customers, setCustomers] = useState<User[]>(dummyCustomers);
-  const [vehicles, setVehicles] = useState<Vehicle[]>(dummyVehicles.map(v => ({
-    ...v,
-    status: 'active' as const,
-    imageUrl: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?q=80&w=2069&auto=format&fit=crop',
-    stnkUrl: 'https://example.com/stnk.pdf',
-    nextMaintenanceDate: '2026-06-01',
-  })));
+  const [drivers, setDrivers] = useState<Driver[]>(() => {
+    const saved = localStorage.getItem('shuttle_drivers');
+    const loadedDrivers = saved ? JSON.parse(saved) : [...dummyDrivers, ...dummyRegistrations];
+    return loadedDrivers;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('shuttle_drivers', JSON.stringify(drivers));
+  }, [drivers]);
+
+  // Derived state for backward compatibility
+  const registrations = drivers.filter(d => d.verificationStatus !== 'approved');
+  
+  const [vehicles, setVehicles] = useState<Vehicle[]>(dummyVehicles);
   const [bookings, setBookings] = useState<Booking[]>(dummyBookings);
-  const [wallets, setWallets] = useState<Wallet[]>(dummyWallets);
-  const [transactions, setTransactions] = useState<Transaction[]>(dummyTransactions.map(t => ({
-    ...t,
-    method: 'bank_transfer',
-    platformFee: t.amount * 0.1,
-    timestamp: t.date,
-    type: 'payment' as const,
-    status: 'success' as const,
-    userId: 'u1',
-    userName: 'Siti Aminah'
-  })));
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
-  const [favorites, setFavorites] = useState<FavoriteLocation[]>([]);
-  const [pickupHistory, setPickupHistory] = useState<PickupHistory[]>([]);
-  const [systemConfig, setSystemConfig] = useState<SystemConfig>({
-    minWithdrawal: 50000,
-    maxWithdrawal: 10000000,
-    serviceFee: 2500,
-    maintenanceMode: false,
-    platformFeePercentage: 10,
-    driverCommissionPercentage: 80,
-    basePricePerKm: 5000,
-    currency: 'IDR',
-    history: [],
-  });
-  const [mapLayer, setMapLayerState] = useState<MapLayerType>(() => {
-    const saved = localStorage.getItem('ridewise_map_layer');
-    return (saved as MapLayerType) || 'osm';
-  });
+  const [rayonPricing, setRayonPricing] = useState<RayonPricing[]>(defaultRayonPricing);
+  const [rideRequests, setRideRequests] = useState<RideRequest[]>([]);
+  const [discounts, setDiscounts] = useState<Discount[]>(dummyDiscounts);
+  const [taxConfigs, setTaxConfigs] = useState<TaxConfig[]>(defaultTaxConfigs);
+  const [auditLogs, setAuditLogs] = useState<PricingAuditLog[]>([]);
+  const [tickets, setTickets] = useState<Ticket[]>(dummyTickets);
+  // Removed separate registrations state
 
-  const setMapLayer = (layer: MapLayerType) => {
-    setMapLayerState(layer);
-    localStorage.setItem('ridewise_map_layer', layer);
-  };
+  
+  // Real-time tracking states
+  const [driverLocations, setDriverLocations] = useState<Record<string, DriverLocation>>({});
+  const [trackingLogs, setTrackingLogs] = useState<TrackingLog[]>([]);
 
-  const addAuditLog = (action: string, details: string) => {
-    if (!currentUser) return;
-    const newLog: AuditLog = {
+  const updateDriverLocation = useCallback((driverId: string, location: DriverLocation) => {
+    setDriverLocations(prev => ({
+      ...prev,
+      [driverId]: location
+    }));
+
+    // Record to tracking log
+    const newLog: TrackingLog = {
+      id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      entityId: driverId,
+      entityType: 'driver',
+      latitude: location.latitude,
+      longitude: location.longitude,
+      speed: location.speed,
+      timestamp: location.timestamp
+    };
+
+    setTrackingLogs(prev => {
+      const updated = [newLog, ...prev];
+      // Keep only last 1000 logs for performance
+      return updated.slice(0, 1000);
+    });
+  }, []);
+
+  const addAuditLog = (log: Omit<PricingAuditLog, 'id' | 'changeDate'>) => {
+    const newLog: PricingAuditLog = {
+      ...log,
       id: `audit-${Date.now()}`,
-      userId: currentUser.id,
-      userName: currentUser.name,
-      action,
-      details,
-      timestamp: new Date().toISOString(),
+      changeDate: new Date().toISOString(),
     };
     setAuditLogs(prev => [newLog, ...prev]);
-  };
-
-  const updateSystemConfig = (config: Partial<SystemConfig>) => {
-    setSystemConfig(prev => ({ ...prev, ...config }));
-    addAuditLog('Update System Config', JSON.stringify(config));
+    // Simulated backup: in a real app, this would be a persistent store or external API
+    console.log("Audit log backed up:", newLog);
   };
 
   const login = (email: string, _password: string, role: UserRole): boolean => {
     if (role === 'customer') {
-      setCurrentUser({ id: 'u1', name: 'Siti Aminah', email, phone: '081200000001', role: 'customer', status: 'active' });
+      setCurrentUser({ id: 'u1', name: 'Siti Aminah', email, phone: '081200000001', role: 'customer' });
     } else if (role === 'driver') {
-      const driver = drivers.find(d => d.email === email);
+      const driver = drivers.find(d => d.phoneNumber === email || d.name.toLowerCase().includes(email.toLowerCase()));
       if (driver) {
-        setCurrentUser({ id: driver.id, name: driver.name, email: driver.email, phone: driver.phone, role: 'driver', status: 'active' });
+        setCurrentUser({ id: driver.id, name: driver.name, email: `${driver.id}@ridewise.com`, phone: driver.phoneNumber, role: 'driver' });
       } else {
-        setCurrentUser({ id: 'd1', name: 'Budi Santoso', email, phone: '081234567890', role: 'driver', status: 'active' });
+        setCurrentUser({ id: 'd1', name: 'Budi Santoso', email: 'budi@ridewise.com', phone: '081234567890', role: 'driver' });
       }
-    } else if (role === 'superadmin') {
-      setCurrentUser({ 
-        id: 'sa1', 
-        name: 'Super Admin', 
-        email, 
-        phone: '081299999999', 
-        role: 'superadmin',
-        status: 'active',
-        permissions: ['manage_admins', 'manage_business', 'manage_system', 'view_analytics', 'manage_finance']
-      });
     } else {
-      setCurrentUser({ 
-        id: 'admin1', 
-        name: 'Administrator', 
-        email, 
-        phone: '081200000000', 
-        role: 'admin', 
-        status: 'active',
-        permissions: ['manage_users', 'manage_drivers', 'manage_vehicles', 'manage_routes']
-      });
+      setCurrentUser({ id: 'admin1', name: 'Administrator', email, phone: '081200000000', role: 'admin' });
     }
     return true;
   };
@@ -162,138 +149,598 @@ export const ShuttleProvider = ({ children }: { children: ReactNode }) => {
 
   const addBooking = (booking: Booking) => {
     setBookings(prev => [...prev, booking]);
-    addPickupHistory({ pointId: booking.pickupPointId, pointName: booking.pickupPointName });
+    notifyBookingCreated(booking);
   };
 
-  const acceptBooking = (bookingId: string) => {
-    const booking = bookings.find((b) => b.id === bookingId);
-    if (!booking) return;
-
-    setBookings(prev => prev.map((b) => b.id === bookingId ? { ...b, status: 'confirmed' } : b));
-
-    const schedule = schedules.find((s) => s.id === booking.scheduleId);
-    if (schedule && !schedule.driverId && currentUser && currentUser.role === 'driver') {
-      setSchedules(prev => prev.map((s) => s.id === schedule.id ? { ...s, driverId: currentUser.id } : s));
-      addAuditLog('Accept Booking', `Driver ${currentUser.name} accepted order ${booking.id} and assigned schedule ${schedule.id}`);
-    } else {
-      addAuditLog('Accept Booking', `Driver ${currentUser?.name} accepted order ${booking.id}`);
-    }
-  };
-
-  const addFavorite = (favorite: Omit<FavoriteLocation, 'id' | 'userId'>) => {
-    if (!currentUser) return;
-    const newFavorite: FavoriteLocation = {
-      id: `fav-${Date.now()}`,
-      userId: currentUser.id,
-      ...favorite
-    };
-    setFavorites(prev => [...prev, newFavorite]);
-    addAuditLog('Add Favorite Location', `User added ${favorite.name} as favorite`);
-  };
-
-  const removeFavorite = (id: string) => {
-    setFavorites(prev => prev.filter(f => f.id !== id));
-    addAuditLog('Remove Favorite Location', `User removed favorite location ${id}`);
-  };
-
-  const addPickupHistory = (point: { pointId: string; pointName: string }) => {
-    if (!currentUser) return;
-    const newHistory: PickupHistory = {
-      id: `hist-${Date.now()}`,
-      userId: currentUser.id,
-      pointId: point.pointId,
-      pointName: point.pointName,
-      timestamp: new Date().toISOString(),
-    };
-    setPickupHistory(prev => {
-      const filtered = prev.filter(h => h.pointId !== point.pointId);
-      return [newHistory, ...filtered].slice(0, 10);
+  const createSecureBooking = (request: BookingRequest): BookingResponse => {
+    const response = processBookingOnServer(request, {
+      users: currentUser ? [currentUser] : [],
+      schedules,
+      routes,
+      routePoints,
+      discounts,
+      taxConfigs,
+      existingBookings: bookings
     });
-  };
 
-  const addTransaction = (transaction: Transaction) => {
-    setTransactions(prev => [...prev, transaction]);
-    setWallets(prev => prev.map(w => w.driverId === transaction.driverId ? { ...w, balance: w.balance + transaction.amount } : w));
-  };
-
-  const withdrawBalance = async (amount: number, bankName: string, accountNumber: string) => {
-    // Simulasi delay API
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    if (!currentUser || currentUser.role !== 'driver') {
-      return { success: false, message: 'Unauthorized' };
+    if (response.success && response.booking) {
+      addBooking(response.booking);
     }
 
-    const wallet = wallets.find(w => w.driverId === currentUser.id);
-    if (!wallet) return { success: false, message: 'Wallet tidak ditemukan' };
-    
-    // Validasi saldo minimum penarikan (misal 50.000)
-    if (amount < 50000) {
-      return { success: false, message: 'Minimal penarikan adalah Rp 50.000' };
-    }
-
-    if (wallet.balance < amount) {
-      return { success: false, message: 'Saldo tidak mencukupi' };
-    }
-
-    // Pencegahan penarikan ganda sederhana (cek apakah ada pending withdrawal)
-    const pendingWithdrawal = transactions.find(t => 
-      t.driverId === currentUser.id && 
-      t.type === 'withdrawal' && 
-      t.status === 'pending'
-    );
-    if (pendingWithdrawal) {
-      return { success: false, message: 'Ada penarikan yang sedang diproses' };
-    }
-
-    const transactionId = `W${Date.now()}`;
-    const reference = `REF-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-
-    const newTransaction: Transaction = {
-      id: transactionId,
-      driverId: currentUser.id,
-      amount: -amount, // Nilai negatif untuk penarikan
-      type: 'withdrawal',
-      status: 'pending',
-      date: new Date().toISOString().split('T')[0],
-      bankName,
-      accountNumber,
-      reference
-    };
-
-    setTransactions(prev => [...prev, newTransaction]);
-    setWallets(prev => prev.map(w => w.driverId === currentUser.id ? { ...w, balance: w.balance - amount } : w));
-
-    addAuditLog('Withdrawal Request', `Driver ${currentUser.name} requested withdrawal of ${amount} to ${bankName} (${accountNumber})`);
-
-    return { success: true, message: 'Permintaan penarikan berhasil diajukan', transactionId };
+    return response;
   };
 
   const updateScheduleStatus = (scheduleId: string, status: Schedule['status']) => {
     setSchedules(prev => prev.map(s => s.id === scheduleId ? { ...s, status } : s));
   };
 
-  const updateScheduleAssignment = (scheduleId: string, updates: Partial<Pick<Schedule, 'vehicleId' | 'driverId' | 'status'>>) => {
-    setSchedules(prev => prev.map(s => s.id === scheduleId ? { ...s, ...updates } : s));
-    if (updates.vehicleId || updates.driverId || updates.status) {
-      addAuditLog('Update Schedule Assignment', `Schedule ${scheduleId} updated with ${JSON.stringify(updates)}`);
-    }
+  const addRideRequest = (request: RideRequest) => {
+    setRideRequests(prev => [...prev, request]);
   };
 
-  const updateRoutePoints = (routeId: string, points: RoutePoint[]) => {
-    setRoutePoints(prev => {
-      const filtered = prev.filter(p => p.routeId !== routeId);
-      return [...filtered, ...points].sort((a, b) => a.order - b.order);
-    });
-    addAuditLog('Update Route Points', `Updated points for route ID ${routeId}`);
+  const acceptRideRequest = (requestId: string) => {
+    setRideRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: 'accepted' as const } : r));
+    const request = rideRequests.find(r => r.id === requestId);
+    if (!request) return;
+    const schedule = schedules.find(s => s.id === request.scheduleId);
+    const route = routes.find(r => r.id === request.routeId);
+    if (!schedule || !route) return;
+
+    const newBooking: Booking = {
+      id: `b${Date.now()}`,
+      userId: request.userId,
+      userName: request.userName,
+      scheduleId: request.scheduleId,
+      routeId: request.routeId,
+      routeName: route.name,
+      pickupPointId: request.pickupPointId,
+      pickupPointName: request.pickupPointName,
+      seatNumber: request.seatNumber,
+      price: request.price,
+      status: 'confirmed',
+      bookingDate: new Date().toISOString().split('T')[0],
+      departureTime: schedule.departureTime,
+      paymentStatus: 'paid',
+      paymentMethod: 'qris',
+      bookingType: 'realtime',
+    };
+    addBooking(newBooking);
   };
+
+  const rejectRideRequest = (requestId: string) => {
+    setRideRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: 'rejected' as const } : r));
+  };
+
+  const checkInPassenger = (bookingId: string) => {
+    setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, checkedIn: true } : b));
+  };
+
+  const updateTicketStatus = (ticketId: string, status: TicketStatus, note?: string) => {
+    setTickets(prev => prev.map(t => {
+      if (t.id !== ticketId) return t;
+      const historyItem = {
+        id: `h-${Date.now()}`,
+        ticketId,
+        status,
+        changedBy: currentUser?.name || 'System',
+        timestamp: new Date().toISOString(),
+        note
+      };
+      return {
+        ...t,
+        status,
+        updatedAt: new Date().toISOString(),
+        history: [...t.history, historyItem]
+      };
+    }));
+    toast.success(`Status tiket diperbarui menjadi ${status}`);
+  };
+
+  const addTicketComment = (ticketId: string, message: string, attachments?: string[]) => {
+    if (!currentUser) return;
+    setTickets(prev => prev.map(t => {
+      if (t.id !== ticketId) return t;
+      const newComment: TicketComment = {
+        id: `c-${Date.now()}`,
+        ticketId,
+        senderId: currentUser.id,
+        senderName: currentUser.name,
+        senderRole: currentUser.role,
+        message,
+        timestamp: new Date().toISOString(),
+        attachments
+      };
+      return {
+        ...t,
+        updatedAt: new Date().toISOString(),
+        comments: [...t.comments, newComment]
+      };
+    }));
+    toast.success('Komentar ditambahkan');
+  };
+
+  const submitDriverRegistration = (reg: Omit<Driver, 'id' | 'verificationStatus' | 'submittedAt' | 'updatedAt' | 'logs' | 'status' | 'rating' | 'totalTrips' | 'joinDate'>) => {
+    const regId = `reg-${Date.now()}`;
+    const newReg: Driver = {
+      ...reg,
+      id: regId,
+      status: 'offline',
+      verificationStatus: 'pending',
+      rating: 0,
+      totalTrips: 0,
+      joinDate: new Date().toISOString().split('T')[0],
+      submittedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      logs: [
+        { id: `l-${Date.now()}`, registrationId: regId, status: 'pending', changedBy: 'System', timestamp: new Date().toISOString(), reason: 'Initial submission' }
+      ]
+    };
+    setDrivers(prev => [...prev, newReg]);
+    toast.success('Pendaftaran driver berhasil dikirim. Mohon tunggu verifikasi admin.');
+  };
+
+  const updateRegistrationStatus = (registrationId: string, status: VerificationStatus, reason?: string) => {
+    // 1. Role-based access control (Only admin can verify)
+    if (!currentUser || currentUser.role !== 'admin') {
+      toast.error('Hanya administrator yang dapat melakukan verifikasi.');
+      return;
+    }
+
+    const registration = drivers.find(r => r.id === registrationId);
+    if (!registration) {
+      toast.error('Pendaftaran tidak ditemukan.');
+      return;
+    }
+
+    // 2. Duplicate Validation (Only check on approval)
+    if (status === 'approved') {
+      const isDuplicate = drivers.some(d => 
+        d.id !== registrationId && d.verificationStatus === 'approved' && (
+          d.licenseNumber === registration.licenseNumber || 
+          d.phoneNumber === registration.phoneNumber ||
+          d.vehicleDetails?.plateNumber === registration.vehicleDetails?.plateNumber
+        )
+      );
+
+      if (isDuplicate) {
+        toast.error('Gagal menyetujui: Data driver atau kendaraan sudah terdaftar dalam sistem.');
+        return;
+      }
+    }
+
+    // 3. Update Status and Audit Log
+    setDrivers(prev => prev.map(r => {
+      if (r.id !== registrationId) return r;
+      
+      const newLog: VerificationLog = {
+        id: `l-${Date.now()}`,
+        registrationId,
+        status,
+        changedBy: currentUser.name,
+        timestamp: new Date().toISOString(),
+        reason
+      };
+
+      return {
+        ...r,
+        verificationStatus: status,
+        rejectionReason: status === 'rejected' ? reason : r.rejectionReason,
+        updatedAt: new Date().toISOString(),
+        logs: r.logs ? [...r.logs, newLog] : [newLog],
+        // If approved, update vehicle details status too
+        vehicleDetails: r.vehicleDetails ? {
+          ...r.vehicleDetails,
+          verificationStatus: status,
+          vin: r.vehicleDetails.vin || `VIN-${Date.now()}`,
+          engineNumber: r.vehicleDetails.engineNumber || `ENG-${Date.now()}`
+        } : undefined
+      };
+    }));
+
+    // 5. Send Real-time Notification to Driver (Simulated)
+    addNotification({
+      title: status === 'approved' ? 'Pendaftaran Disetujui' : 'Pendaftaran Ditolak',
+      message: status === 'approved' 
+        ? `Selamat ${registration.name}, pendaftaran Anda telah disetujui. Anda sekarang dapat login sebagai driver.`
+        : `Mohon maaf, pendaftaran Anda ditolak. Alasan: ${reason || 'Data tidak lengkap'}`,
+      type: 'system',
+      role: 'driver'
+    });
+    
+    toast.success(`Status pendaftaran diperbarui menjadi ${status}`);
+  };
+
+  const updateDriverStatus = async (driverId: string, status: 'online' | 'offline', retryCount = 0): Promise<boolean> => {
+    const MAX_RETRIES = 3;
+    const WAIT_TIME = 2000; // 2 seconds minimum between changes
+
+    const driver = drivers.find(d => d.id === driverId);
+    if (!driver) return false;
+
+    // 1. Validation: Wait time check
+    if (driver.lastStatusChange) {
+      const lastChange = new Date(driver.lastStatusChange).getTime();
+      const now = Date.now();
+      if (now - lastChange < WAIT_TIME) {
+        toast.error(`Mohon tunggu sebentar sebelum mengubah status kembali.`);
+        return false;
+      }
+    }
+
+    // 2. Mock Server Sync with Retry Mechanism
+    const syncWithServer = async (): Promise<boolean> => {
+      // Simulate network failure 20% of the time for testing retry
+      const isSuccess = Math.random() > 0.2;
+      return new Promise((resolve) => {
+        setTimeout(() => resolve(isSuccess), 500);
+      });
+    };
+
+    const success = await syncWithServer();
+    if (!success) {
+      if (retryCount < MAX_RETRIES) {
+        console.warn(`[SYNC RETRY] Gagal sinkronisasi status ke server. Mencoba ulang (${retryCount + 1}/${MAX_RETRIES})...`);
+        return updateDriverStatus(driverId, status, retryCount + 1);
+      } else {
+        toast.error('Gagal sinkronisasi status ke server setelah beberapa kali percobaan.');
+        return false;
+      }
+    }
+
+    // 3. Update Local State
+    setDrivers(prev => prev.map(d => 
+      d.id === driverId 
+        ? { ...d, status, lastStatusChange: new Date().toISOString() } 
+        : d
+    ));
+
+    // 4. Notifications
+    const statusMsg = status === 'online' ? 'Anda sekarang ONLINE dan dapat menerima pesanan.' : 'Anda sekarang OFFLINE.';
+    toast.success(statusMsg);
+    
+    // In a real app, we would emit a socket event here:
+    // socket.emit('driver_status_changed', { driverId, status });
+    console.log(`[SERVER NOTIFY] Driver ${driverId} status changed to ${status}`);
+    return true;
+  };
+
+  const updateDriverProfile = (driverId: string, updates: Partial<Driver>) => {
+    setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, ...updates } : d));
+    toast.success('Profil berhasil diperbarui');
+  };
+
+  /**
+   * Recalculates total route distance and price using Haversine formula
+   * based on coordinates of all route points.
+   */
+  const recalculateRouteDistanceAndPrice = (
+    routeId: string,
+    roadConditionMultiplier = 1,
+    vehicleTypeMultiplier = 1
+  ) => {
+    const routePts = routePoints.filter(p => p.routeId === routeId).sort((a, b) => a.order - b.order);
+    if (routePts.length < 2) return;
+
+    let totalDistanceKm = 0;
+    const updatedPoints: RoutePoint[] = [...routePts];
+
+    // Calculate distance between sequential points
+    for (let i = 0; i < updatedPoints.length; i++) {
+      if (i === 0) {
+        updatedPoints[i].distanceFromPrevious = 0;
+        updatedPoints[i].cumulativeDistance = 0;
+      } else {
+        const prev = updatedPoints[i - 1];
+        const curr = updatedPoints[i];
+        
+        if (isValidRouteData(prev.lat, prev.lng, curr.lat, curr.lng)) {
+          const dist = calculateHaversineDistance(prev.lat, prev.lng, curr.lat, curr.lng);
+          totalDistanceKm += dist;
+          updatedPoints[i].distanceFromPrevious = Math.round(dist * 1000); // meters
+          updatedPoints[i].cumulativeDistance = Math.round(totalDistanceKm * 1000); // meters
+        }
+      }
+    }
+
+    const totalDistanceMeters = Math.round(totalDistanceKm * 1000);
+
+    setRoutePoints(prev => {
+      const others = prev.filter(p => p.routeId !== routeId);
+      const finalizedPoints = updatedPoints.map(p => ({
+        ...p,
+        distanceToDestination: totalDistanceMeters - p.cumulativeDistance,
+      }));
+      return [...others, ...finalizedPoints];
+    });
+
+    setRoutes(prev => prev.map(r => {
+      if (r.id !== routeId) return r;
+      
+      const pricePerMeter = r.pricePerMeter || 2;
+      const { finalPrice } = calculateFinalPrice(totalDistanceMeters, pricePerMeter, {
+        multipliers: { roadCondition: roadConditionMultiplier, vehicleType: vehicleTypeMultiplier }
+      });
+
+      return {
+        ...r,
+        distanceMeters: totalDistanceMeters,
+        distanceKm: Number(totalDistanceKm.toFixed(2)),
+        price: finalPrice,
+        roadConditionMultiplier,
+        vehicleTypeMultiplier
+      };
+    }));
+  };
+
+  const recalcRoutePointPrices = (
+    routeId: string, 
+    pricePerMeter: number, 
+    roadConditionMultiplier?: number, 
+    vehicleTypeMultiplier?: number
+  ) => {
+    setRoutePoints(prev => {
+      const routePts = prev.filter(p => p.routeId === routeId).sort((a, b) => a.order - b.order);
+      const totalDist = routePts.length > 0 ? routePts[routePts.length - 1].cumulativeDistance : 0;
+      
+      // Use provided multipliers or fallback to current route state
+      const route = routes.find(r => r.id === routeId);
+      const roadMultiplier = roadConditionMultiplier !== undefined ? roadConditionMultiplier : (route?.roadConditionMultiplier || 1);
+      const vehicleMultiplier = vehicleTypeMultiplier !== undefined ? vehicleTypeMultiplier : (route?.vehicleTypeMultiplier || 1);
+
+      const updated = routePts.map(p => {
+        const { finalPrice } = calculateFinalPrice(totalDist - p.cumulativeDistance, pricePerMeter, {
+          multipliers: { roadCondition: roadMultiplier, vehicleType: vehicleMultiplier }
+        });
+        return {
+          ...p,
+          distanceToDestination: totalDist - p.cumulativeDistance,
+          price: finalPrice,
+        };
+      });
+      const others = prev.filter(p => p.routeId !== routeId);
+      return [...others, ...updated];
+    });
+    setRoutes(prev => prev.map(r => {
+      if (r.id !== routeId) return r;
+      const routePts = routePoints.filter(p => p.routeId === routeId).sort((a, b) => a.order - b.order);
+      const totalDist = routePts.length > 0 ? routePts[routePts.length - 1].cumulativeDistance : 0;
+      
+      const roadMultiplier = roadConditionMultiplier !== undefined ? roadConditionMultiplier : (r.roadConditionMultiplier || 1);
+      const vehicleMultiplier = vehicleTypeMultiplier !== undefined ? vehicleTypeMultiplier : (r.vehicleTypeMultiplier || 1);
+      
+      const { finalPrice } = calculateFinalPrice(totalDist, pricePerMeter, {
+        multipliers: { roadCondition: roadMultiplier, vehicleType: vehicleMultiplier }
+      });
+      return { 
+        ...r, 
+        pricePerMeter, 
+        price: finalPrice,
+        roadConditionMultiplier: roadMultiplier,
+        vehicleTypeMultiplier: vehicleMultiplier
+      };
+    }));
+  };
+
+  const assignDriverToSchedule = useCallback((scheduleId: string, driverId: string) => {
+    const schedule = schedules.find(s => s.id === scheduleId);
+    const driver = drivers.find(d => d.id === driverId);
+
+    if (!schedule || !driver) {
+      toast.error('Jadwal atau driver tidak ditemukan');
+      return;
+    }
+
+    // Check if driver is already assigned to another schedule at the same time
+    const conflictingSchedule = schedules.find(s =>
+      s.id !== scheduleId &&
+      s.driverId === driverId &&
+      s.departureDate === schedule.departureDate &&
+      Math.abs(new Date(`2000-01-01T${s.departureTime}`).getTime() - new Date(`2000-01-01T${schedule.departureTime}`).getTime()) < 2 * 60 * 60 * 1000 // 2 hours buffer
+    );
+
+    if (conflictingSchedule) {
+      toast.error('Driver sudah memiliki jadwal di waktu yang sama');
+      return;
+    }
+
+    // Update schedule with driver assignment
+    setSchedules(prev => prev.map(s =>
+      s.id === scheduleId ? { ...s, driverId, status: 'scheduled' as const } : s
+    ));
+
+    // Notify driver
+    addNotification({
+      title: 'Jadwal Baru Ditugaskan',
+      message: `Anda ditugaskan untuk rute ${routes.find(r => r.id === schedule.routeId)?.name} pada ${schedule.departureDate} jam ${schedule.departureTime}`,
+      type: 'trip',
+      role: 'driver'
+    });
+
+    // Notify admin
+    addNotification({
+      title: 'Driver Ditugaskan',
+      message: `${driver.name} ditugaskan ke jadwal ${routes.find(r => r.id === schedule.routeId)?.name}`,
+      type: 'system',
+      role: 'admin'
+    });
+
+    toast.success(`Driver ${driver.name} berhasil ditugaskan ke jadwal`);
+  }, [schedules, drivers, routes, addNotification]);
+
+  const removeDriverFromSchedule = useCallback((scheduleId: string) => {
+    const schedule = schedules.find(s => s.id === scheduleId);
+    if (!schedule) return;
+
+    setSchedules(prev => prev.map(s =>
+      s.id === scheduleId ? { ...s, driverId: undefined, status: 'cancelled' as const } : s
+    ));
+
+    // Notify driver if assigned
+    if (schedule.driverId) {
+      addNotification({
+        title: 'Jadwal Dibatalkan',
+        message: `Penugasan untuk rute ${routes.find(r => r.id === schedule.routeId)?.name} telah dibatalkan`,
+        type: 'trip',
+        role: 'driver'
+      });
+    }
+
+    toast.success('Driver berhasil dihapus dari jadwal');
+  }, [schedules, routes, addNotification]);
+
+  const updateTripStatus = useCallback((scheduleId: string, status: Schedule['status'], notes?: string) => {
+    const schedule = schedules.find(s => s.id === scheduleId);
+    if (!schedule) return;
+
+    const route = routes.find(r => r.id === schedule.routeId);
+    const driver = drivers.find(d => d.id === schedule.driverId);
+
+    setSchedules(prev => prev.map(s =>
+      s.id === scheduleId ? { ...s, status, updatedAt: new Date().toISOString() } : s
+    ));
+
+    // Notify passengers
+    const affectedBookings = bookings.filter(b => b.scheduleId === scheduleId && b.status === 'confirmed');
+    affectedBookings.forEach(booking => {
+      let message = '';
+      switch (status) {
+        case 'boarding':
+          message = `Shuttle ${route?.name} sedang boarding. Silakan menuju halte keberangkatan.`;
+          break;
+        case 'departed':
+          message = `Shuttle ${route?.name} telah berangkat dari halte keberangkatan.`;
+          break;
+        case 'arrived':
+          message = `Shuttle ${route?.name} telah tiba di tujuan. Terima kasih telah menggunakan layanan kami.`;
+          break;
+        case 'cancelled':
+          message = `Maaf, perjalanan ${route?.name} telah dibatalkan. ${notes || ''}`;
+          break;
+      }
+
+      if (message) {
+        addNotification({
+          title: `Update Perjalanan - ${route?.name}`,
+          message,
+          type: 'trip',
+          role: 'customer'
+        });
+      }
+    });
+
+    // Notify driver
+    if (driver) {
+      let driverMessage = '';
+      switch (status) {
+        case 'boarding':
+          driverMessage = `Waktunya boarding untuk rute ${route?.name}. Pastikan semua penumpang sudah naik.`;
+          break;
+        case 'departed':
+          driverMessage = `Perjalanan ${route?.name} telah dimulai. Selamat berkendara!`;
+          break;
+        case 'arrived':
+          driverMessage = `Perjalanan ${route?.name} telah selesai. Terima kasih atas dedikasinya.`;
+          break;
+      }
+
+      if (driverMessage) {
+        addNotification({
+          title: 'Update Status Trip',
+          message: driverMessage,
+          type: 'trip',
+          role: 'driver'
+        });
+      }
+    }
+
+    // Notify admin
+    addNotification({
+      title: 'Update Status Trip',
+      message: `Trip ${route?.name} status: ${status}${notes ? ` - ${notes}` : ''}`,
+      type: 'trip',
+      role: 'admin'
+    });
+
+    toast.success(`Status trip diperbarui menjadi ${status}`);
+  }, [schedules, routes, drivers, bookings, addNotification]);
+
+  const notifyBookingCreated = useCallback((booking: Booking) => {
+    const route = routes.find(r => r.id === booking.routeId);
+    const schedule = schedules.find(s => s.id === booking.scheduleId);
+
+    // Notify passenger
+    addNotification({
+      title: 'Booking Berhasil',
+      message: `Booking ${route?.name} kursi ${booking.seatNumber} telah dikonfirmasi`,
+      type: 'booking',
+      role: 'customer'
+    });
+
+    // Notify driver if assigned
+    if (schedule?.driverId) {
+      const driver = drivers.find(d => d.id === schedule.driverId);
+      if (driver) {
+        addNotification({
+          title: 'Penumpang Baru',
+          message: `${booking.userName} telah booking kursi ${booking.seatNumber} untuk rute ${route?.name}`,
+          type: 'booking',
+          role: 'driver'
+        });
+      }
+    }
+
+    // Notify admin
+    addNotification({
+      title: 'Booking Baru',
+      message: `Booking baru: ${booking.userName} - ${route?.name} kursi ${booking.seatNumber}`,
+      type: 'booking',
+      role: 'admin'
+    });
+  }, [routes, schedules, drivers, addNotification]);
+
+  const notifyTripUpdate = useCallback((scheduleId: string, status: Schedule['status']) => {
+    updateTripStatus(scheduleId, status);
+  }, [updateTripStatus]);
+
+  const getAvailableDrivers = useCallback((date: string, timeSlot?: string) => {
+    return drivers.filter(driver => {
+      // Driver must be approved and online
+      if (driver.verificationStatus !== 'approved' || driver.status !== 'online') {
+        return false;
+      }
+
+      // Check if driver has conflicting schedules
+      const hasConflict = schedules.some(schedule =>
+        schedule.driverId === driver.id &&
+        schedule.departureDate === date &&
+        (!timeSlot || Math.abs(new Date(`2000-01-01T${schedule.departureTime}`).getTime() - new Date(`2000-01-01T${timeSlot}`).getTime()) < 2 * 60 * 60 * 1000)
+      );
+
+      return !hasConflict;
+    });
+  }, [drivers, schedules]);
+
+  const getDriverSchedule = useCallback((driverId: string, date?: string) => {
+    return schedules.filter(schedule =>
+      schedule.driverId === driverId &&
+      (!date || schedule.departureDate === date)
+    );
+  }, [schedules]);
 
   return (
     <ShuttleContext.Provider value={{
       currentUser, login, logout,
-      rayons, routes, routePoints, schedules, drivers, customers, vehicles, bookings, wallets, transactions, auditLogs, favorites, pickupHistory, systemConfig, mapLayer,
-      addBooking, acceptBooking, addTransaction, addAuditLog, addFavorite, removeFavorite, addPickupHistory, updateSystemConfig, setMapLayer, withdrawBalance, updateScheduleStatus, updateScheduleAssignment, updateRoutePoints,
-      setRayons, setRoutes, setRoutePoints, setSchedules, setDrivers, setCustomers, setVehicles, setBookings, setWallets, setTransactions, setAuditLogs,
+      routes, routePoints, schedules, drivers, vehicles, bookings, rayonPricing, rideRequests,
+      discounts, taxConfigs, auditLogs,
+      driverLocations, trackingLogs, updateDriverLocation,
+      tickets, updateTicketStatus, addTicketComment,
+      registrations, submitDriverRegistration, updateRegistrationStatus,
+      addAuditLog, createSecureBooking, addBooking, updateScheduleStatus, addRideRequest, acceptRideRequest, rejectRideRequest, checkInPassenger,
+      updateDriverStatus, updateDriverProfile,
+      recalcRoutePointPrices, recalculateRouteDistanceAndPrice,
+      assignDriverToSchedule, removeDriverFromSchedule, updateTripStatus, notifyBookingCreated, notifyTripUpdate, getAvailableDrivers, getDriverSchedule,
+      setRoutes, setRoutePoints, setSchedules, setDrivers, setVehicles, setBookings, setRayonPricing,
+      setDiscounts, setTaxConfigs,
     }}>
       {children}
     </ShuttleContext.Provider>

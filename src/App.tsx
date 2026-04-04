@@ -18,46 +18,41 @@ import CustomerBookingDetail from "./pages/customer/CustomerBookingDetail";
 import CustomerHistory from "./pages/customer/CustomerHistory";
 import CustomerTickets from "./pages/customer/CustomerTickets";
 import CustomerProfile from "./pages/customer/CustomerProfile";
+import CustomerRideNow from "./pages/customer/CustomerRideNow";
 
 import DriverLogin from "./pages/driver/DriverLogin";
 import DriverLayout from "./layouts/DriverLayout";
 import DriverDashboard from "./pages/driver/DriverDashboard";
 import DriverTripDetail from "./pages/driver/DriverTripDetail";
 import DriverTrips from "./pages/driver/DriverTrips";
-import DriverWallet from "./pages/driver/DriverWallet";
-import DriverTopUp from "./pages/driver/DriverTopUp";
-import DriverWithdraw from "./pages/driver/DriverWithdraw";
 import DriverTracking from "./pages/driver/DriverTracking";
+import DriverProfile from "./pages/driver/DriverProfile";
 
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminLayout from "./layouts/AdminLayout";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminRoutes from "./pages/admin/AdminRoutes";
-import AdminPoints from "./pages/admin/AdminPoints";
-import AdminSchedules from "./pages/admin/AdminSchedules";
-import AdminDrivers from "./pages/admin/AdminDrivers";
-import AdminUsers from "./pages/admin/AdminUsers";
+
+
+import AdminDrivers from "./pages/admin/AdminDriverManager";
 import AdminVehicles from "./pages/admin/AdminVehicles";
-import AdminAssign from "./pages/admin/AdminAssign";
+
 import AdminBookings from "./pages/admin/AdminBookings";
 import AdminReports from "./pages/admin/AdminReports";
-import AdminAudit from "./pages/admin/AdminAudit";
 import AdminTracking from "./pages/admin/AdminTracking";
 import AdminAnalytics from "./pages/admin/AdminAnalytics";
 import AdminPaymentSettings from "./pages/admin/AdminPaymentSettings";
-
-import SuperAdminDashboard from "./pages/superadmin/SuperAdminDashboard";
-import BusinessConfig from "./pages/superadmin/BusinessConfig";
-import AdminManagement from "./pages/superadmin/AdminManagement";
-import GlobalMonitoring from "./pages/superadmin/GlobalMonitoring";
+import AdminTicketDetail from "./pages/admin/AdminTicketDetail";
+import AdminDriverVerification from "./pages/admin/AdminDriverManager";
+import DriverRegister from "./pages/driver/DriverRegister";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <ShuttleProvider>
-        <NotificationProvider>
+      <NotificationProvider>
+        <ShuttleProvider>
           <Toaster />
           <Sonner />
           <BrowserRouter
@@ -78,19 +73,19 @@ const App = () => (
                 <Route path="booking/:bookingId" element={<CustomerBookingDetail />} />
                 <Route path="history" element={<CustomerHistory />} />
                 <Route path="tickets" element={<CustomerTickets />} />
+                <Route path="ride-now" element={<CustomerRideNow />} />
                 <Route path="profile" element={<CustomerProfile />} />
               </Route>
 
               {/* Driver */}
               <Route path="/driver/login" element={<DriverLogin />} />
+              <Route path="/driver/register" element={<DriverRegister />} />
               <Route path="/driver" element={<DriverLayout />}>
                 <Route index element={<DriverDashboard />} />
                 <Route path="trips" element={<DriverTrips />} />
                 <Route path="trip/:scheduleId" element={<DriverTripDetail />} />
-                <Route path="wallet" element={<DriverWallet />} />
-                <Route path="wallet/top-up" element={<DriverTopUp />} />
-                <Route path="wallet/withdraw" element={<DriverWithdraw />} />
                 <Route path="tracking" element={<DriverTracking />} />
+                <Route path="profile" element={<DriverProfile />} />
               </Route>
 
               {/* Admin */}
@@ -98,40 +93,24 @@ const App = () => (
               <Route path="/admin" element={<AdminLayout />}>
                 <Route index element={<AdminDashboard />} />
                 <Route path="routes" element={<AdminRoutes />} />
-                <Route path="points" element={<AdminPoints />} />
-                <Route path="schedules" element={<AdminSchedules />} />
+                
                 <Route path="drivers" element={<AdminDrivers />} />
-                <Route path="users" element={<AdminUsers />} />
                 <Route path="vehicles" element={<AdminVehicles />} />
-                <Route path="assign" element={<AdminAssign />} />
+                
                 <Route path="bookings" element={<AdminBookings />} />
                 <Route path="reports" element={<AdminReports />} />
                 <Route path="tracking" element={<AdminTracking />} />
                 <Route path="analytics" element={<AdminAnalytics />} />
-              </Route>
-
-              {/* Super Admin */}
-              <Route path="/superadmin" element={<AdminLayout />}>
-                <Route index element={<SuperAdminDashboard />} />
-                <Route path="admins" element={<AdminManagement />} />
-                <Route path="business-config" element={<BusinessConfig />} />
-                <Route path="monitoring" element={<GlobalMonitoring />} />
                 <Route path="payment-settings" element={<AdminPaymentSettings />} />
-                <Route path="routes" element={<AdminRoutes />} />
-                <Route path="schedules" element={<AdminSchedules />} />
-                <Route path="drivers" element={<AdminDrivers />} />
-                <Route path="users" element={<AdminUsers />} />
-                <Route path="vehicles" element={<AdminVehicles />} />
-                <Route path="bookings" element={<AdminBookings />} />
-                <Route path="audit" element={<AdminAudit />} />
-                <Route path="analytics" element={<AdminAnalytics />} />
+                <Route path="ticket/:ticketId" element={<AdminTicketDetail />} />
+                <Route path="verifications" element={<AdminDriverVerification />} />
               </Route>
 
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
-        </NotificationProvider>
-      </ShuttleProvider>
+        </ShuttleProvider>
+      </NotificationProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

@@ -1,22 +1,30 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { format } from 'date-fns';
+import { id as localeId } from 'date-fns/locale';
 import { useShuttle } from '@/contexts/ShuttleContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, MapPin, Info, Navigation, History, Star, Users, Clock } from 'lucide-react';
-import { formatRupiah, generateSeats } from '@/data/dummy';
+import { Separator } from '@/components/ui/separator';
+import { ArrowLeft, Ticket, Percent, Info, AlertCircle, CheckCircle2, Loader2, Navigation, Sparkles } from 'lucide-react';
+import { generateSeats } from '@/data/dummy';
+import { calculateFinalPrice, formatPrice } from '@/lib/pricing';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { PaymentModal } from '@/components/PaymentModal';
-import { PaymentMethod } from '@/types/shuttle';
-import { CustomerPickupMap } from '@/components/customer/CustomerPickupMap';
-import { Separator } from '@/components/ui/separator';
+import { PaymentMethod, Discount } from '@/types/shuttle';
 
 const CustomerBookingNew = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { routes, routePoints, schedules, vehicles, bookings, addBooking, setBookings, currentUser, addAuditLog } = useShuttle();
+  const { 
+    routes, routePoints, schedules, vehicles, bookings, 
+    addBooking, setBookings, currentUser,
+    discounts, taxConfigs, createSecureBooking
+  } = useShuttle();
 
   const scheduleId = searchParams.get('scheduleId') || '';
   const routeId = searchParams.get('routeId') || '';
@@ -30,18 +38,82 @@ const CustomerBookingNew = () => {
   const [selectedPickup, setSelectedPickup] = useState('');
   const [showPayment, setShowPayment] = useState(false);
   const [lastBookingId, setLastBookingId] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  
+  const [promoCode, setPromoCode] = useState('');
+  const [appliedPromo, setAppliedPromo] = useState<Discount | null>(null);
+  const [promoError, setPromoError] = useState('');
 
-  const selectedPoint = points.find(p => p.id === selectedPickup);
-  const currentPrice = selectedPoint?.price || 0;
+  const pickupPoint = points.find(p => p.id === selectedPickup);
+  const basePrice = pickupPoint?.price || route?.price || 0;
+
+  // Calculate pricing details
+  const pricingDetails = useMemo(() => {
+    if (!route) return null;
+    
+    const activeTax = taxConfigs.find(t => t.isActive);
+    const taxRate = activeTax?.rate || 0;
+    
+    // We treat 'price' as already having multipliers applied from context
+    // So we use a distance of 1 and pricePerMeter as the basePrice
+    return calculateFinalPrice(1, basePrice, {
+      discountRate: appliedPromo?.type === 'percentage' ? appliedPromo.value / 100 : 0,
+      discountFixed: appliedPromo?.type === 'fixed' ? appliedPromo.value : 0,
+      maxDiscount: appliedPromo?.maxDiscountAmount,
+      taxRate: taxRate,
+    });
+  }, [basePrice, appliedPromo, route, taxConfigs]);
+
+  const handleApplyPromo = () => {
+    setPromoError('');
+    if (!promoCode.trim()) return;
+
+    const promo = discounts.find(d => d.code.toUpperCase() === promoCode.toUpperCase());
+    
+    if (!promo) {
+      setPromoError('Kode promo tidak ditemukan');
+      setAppliedPromo(null);
+      return;
+    }
+
+    if (!promo.isActive) {
+      setPromoError('Promo ini sudah tidak aktif');
+      setAppliedPromo(null);
+      return;
+    }
+
+    const now = new Date();
+    if (now < new Date(promo.startDate) || now > new Date(promo.endDate)) {
+      setPromoError('Promo sudah kedaluwarsa atau belum dimulai');
+      setAppliedPromo(null);
+      return;
+    }
+
+    if (promo.usageCount >= promo.usageLimit) {
+      setPromoError('Kuota promo sudah habis');
+      setAppliedPromo(null);
+      return;
+    }
+
+    if (basePrice < promo.minBookingAmount) {
+      setPromoError(`Minimum transaksi untuk promo ini adalah ${formatPrice(promo.minBookingAmount)}`);
+      setAppliedPromo(null);
+      return;
+    }
+
+    setAppliedPromo(promo);
+    toast.success(`Promo ${promo.code} berhasil digunakan!`);
+  };
+
+  const handleRemovePromo = () => {
+    setAppliedPromo(null);
+    setPromoCode('');
+  };
 
   const handlePaymentConfirm = (method: PaymentMethod) => {
     setBookings(prev => prev.map(b => b.id === lastBookingId ? { ...b, paymentStatus: 'paid' as const, paymentMethod: method } : b));
     setShowPayment(false);
     toast.success('Booking & pembayaran berhasil!');
-    
-    // Notification to Admin/Driver via Audit Log & UI
-    addAuditLog('New Booking Confirmed', `User ${currentUser?.name} confirmed booking ${lastBookingId} via ${method}`);
-    
     navigate(`/customer/booking/${lastBookingId}`);
   };
 
@@ -56,191 +128,249 @@ const CustomerBookingNew = () => {
       toast.error('Pilih kursi dan titik penjemputan!');
       return;
     }
-    const pickup = points.find(p => p.id === selectedPickup);
-    const newBooking = {
-      id: `b${Date.now()}`,
-      userId: currentUser?.id || 'u1',
-      userName: currentUser?.name || 'Guest',
-      scheduleId,
-      routeId,
-      routeName: route.name,
-      pickupPointId: selectedPickup,
-      pickupPointName: pickup?.name || '',
-      seatNumber: selectedSeat,
-      price: currentPrice,
-      status: 'confirmed' as const,
-      bookingDate: new Date().toISOString().split('T')[0],
-      departureTime: schedule.departureTime,
-      paymentStatus: 'pending' as const,
-      paymentMethod: null,
-    };
-    addBooking(newBooking);
-    setLastBookingId(newBooking.id);
-    setShowPayment(true);
     
-    // Real-time synchronization hint: Notify admin of pending booking
-    addAuditLog('New Booking Pending', `User ${currentUser?.name} created a new booking ${newBooking.id}`);
+    setIsProcessing(true);
+    
+    // Simulasi delay network
+    setTimeout(() => {
+      const response = createSecureBooking({
+        userId: currentUser?.id || 'u1',
+        scheduleId,
+        pickupPointId: selectedPickup,
+        seatNumber: selectedSeat,
+        promoCode: appliedPromo?.code,
+        bookingType: 'scheduled'
+      });
+
+      if (response.success && response.booking) {
+        setLastBookingId(response.booking.id);
+        setShowPayment(true);
+      } else {
+        toast.error(response.error || "Gagal membuat booking");
+      }
+      setIsProcessing(false);
+    }, 800);
   };
 
   return (
-    <div className="p-4 space-y-4 max-w-2xl mx-auto">
-      <div className="flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="hover:bg-primary/10 hover:text-primary">
-          <ArrowLeft className="h-4 w-4 mr-1" /> Kembali
+    <div className="min-h-full bg-background pb-10 animate-in fade-in duration-500">
+      <div className="p-4 flex items-center gap-3">
+        <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="rounded-full hover:bg-muted">
+          <ArrowLeft className="h-5 w-5" />
         </Button>
-        <Badge variant="outline" className="text-xs font-mono">
-          ID: {scheduleId.substring(0, 8)}
-        </Badge>
+        <h2 className="text-xl font-black tracking-tight text-foreground">Buat Booking</h2>
       </div>
 
-      <Card className="border-none shadow-md bg-gradient-to-br from-primary to-blue-600 text-primary-foreground">
-        <CardContent className="p-6 space-y-4">
-          <div className="flex justify-between items-start">
-            <div className="space-y-1">
-              <p className="text-xs opacity-70 uppercase tracking-widest font-bold">Rute Perjalanan</p>
-              <h2 className="text-2xl font-bold leading-tight">{route.name}</h2>
-            </div>
-            <div className="bg-white/20 p-2 rounded-lg backdrop-blur-md">
-              <Navigation className="h-6 w-6" />
-            </div>
-          </div>
-          
-          <Separator className="bg-white/20" />
-          
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 opacity-70" />
-              <span>{schedule.departureTime} WIB</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 opacity-70" />
-              <span>{vehicle.name}</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Pickup Point with Integrated Map */}
-      <Card className="border-none shadow-md overflow-hidden">
-        <CardHeader className="pb-2 bg-slate-50/50">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <MapPin className="h-5 w-5 text-primary" />
-              Pilih Titik Jemput
-            </CardTitle>
-            <Badge variant="outline" className="text-[10px] uppercase font-bold text-muted-foreground border-slate-200">Real-time Data</Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="p-4 space-y-4">
-          <CustomerPickupMap 
-            selectedPointId={selectedPickup}
-            onPointSelect={setSelectedPickup}
-            routePoints={points}
-          />
-          
-          <div className="space-y-2">
-            <Select value={selectedPickup} onValueChange={setSelectedPickup}>
-              <SelectTrigger className="h-12 border-slate-200 focus:ring-primary">
-                <SelectValue placeholder="Pilih titik jemput dari peta atau daftar" />
-              </SelectTrigger>
-              <SelectContent>
-                {points.map(p => (
-                  <SelectItem key={p.id} value={p.id}>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className="font-mono text-[10px] px-1.5 h-5">{p.code}</Badge>
-                      <span>{p.name}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <div className="flex items-center gap-1.5 px-1">
-              <Info className="h-3 w-3 text-muted-foreground" />
-              <p className="text-[10px] text-muted-foreground leading-none">Driver akan menjemput Anda tepat di titik lokasi yang dipilih.</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Seat Selection */}
-      <Card className="border-none shadow-md">
-        <CardHeader className="pb-2 bg-slate-50/50">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" />
-              Pilih Kursi
-            </CardTitle>
-            <div className="flex gap-2">
-              <div className="flex items-center gap-1 text-[10px] font-medium"><span className="w-2 h-2 rounded bg-success" /> Tersedia</div>
-              <div className="flex items-center gap-1 text-[10px] font-medium"><span className="w-2 h-2 rounded bg-destructive" /> Terisi</div>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="p-6">
-          <div className="bg-slate-100 dark:bg-slate-900 rounded-2xl p-6 ring-1 ring-slate-200/50">
-            <div className="flex justify-between items-center mb-6">
-              <div className="h-10 w-10 rounded-full bg-slate-300 flex items-center justify-center text-[10px] font-bold text-slate-500 shadow-inner">KEMUDI</div>
-              <div className="h-2 w-12 rounded-full bg-slate-400/20" />
-            </div>
-            
-            <div className={`grid gap-4 ${cols === 3 ? 'grid-cols-3' : 'grid-cols-2'}`} style={{ maxWidth: cols === 3 ? '220px' : '140px', margin: '0 auto' }}>
-              {seats.map(seat => {
-                const isBooked = bookedSeats.includes(seat.seatNumber);
-                const isSelected = selectedSeat === seat.seatNumber;
-                return (
-                  <button
-                    key={seat.seatNumber}
-                    disabled={isBooked}
-                    onClick={() => setSelectedSeat(isSelected ? null : seat.seatNumber)}
-                    className={`aspect-square rounded-xl flex items-center justify-center text-sm font-bold transition-all relative overflow-hidden ${
-                      isBooked ? 'bg-destructive/10 text-destructive cursor-not-allowed border-destructive/20' :
-                      isSelected ? 'bg-primary text-primary-foreground scale-110 shadow-lg ring-4 ring-primary/20' :
-                      'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 shadow-sm'
-                    }`}
-                  >
-                    {seat.seatNumber}
-                    {isBooked && <div className="absolute inset-0 flex items-center justify-center bg-destructive/10"><span className="w-1/2 h-[2px] bg-destructive/40 rotate-45" /><span className="w-1/2 h-[2px] bg-destructive/40 -rotate-45" /></div>}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Action Footer */}
-      <div className="sticky bottom-4 z-40 px-1">
-        <Card className="border-none shadow-2xl bg-white/80 backdrop-blur-xl ring-1 ring-black/5">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between gap-4">
-              <div className="space-y-0.5">
-                <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
-                  {selectedPickup ? 'Total Pembayaran' : 'Estimasi Harga'}
-                </p>
-                <div className="flex items-baseline gap-1">
-                  <p className="text-2xl font-black text-primary">
-                    {formatRupiah(currentPrice > 0 ? currentPrice : 0)}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground font-medium">/ pax</p>
+      <div className="px-4 space-y-6">
+        {/* Journey Summary */}
+        <div className="bg-primary p-6 rounded-[32px] text-primary-foreground shadow-lg shadow-primary/20 relative overflow-hidden group">
+          <div className="relative z-10 flex justify-between items-start">
+            <div className="space-y-4">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-70 mb-1">Rute Perjalanan</p>
+                <h3 className="text-xl font-black leading-tight">{route.name}</h3>
+              </div>
+              <div className="flex gap-6">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest opacity-70 mb-1">Waktu</p>
+                  <p className="text-sm font-bold">{schedule.departureTime}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest opacity-70 mb-1">Tanggal</p>
+                  <p className="text-sm font-bold">{format(new Date(schedule.departureDate), 'dd MMM yyyy', { locale: localeId })}</p>
                 </div>
               </div>
-              <Button 
-                className="h-12 px-8 rounded-xl font-bold text-sm shadow-lg shadow-primary/25 transition-all active:scale-95 flex-1 max-w-[180px]" 
-                size="lg" 
-                onClick={handleBooking} 
-                disabled={!selectedSeat || !selectedPickup}
-              >
-                Booking Sekarang
-              </Button>
+            </div>
+            <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-md">
+              <Navigation className="h-6 w-6 fill-current" />
+            </div>
+          </div>
+          <Sparkles className="absolute -right-4 -bottom-4 h-32 w-32 opacity-10 group-hover:rotate-12 transition-transform duration-700" />
+        </div>
+
+        {/* Pickup Selection */}
+        <section className="space-y-3">
+          <h3 className="font-black text-sm uppercase tracking-widest text-muted-foreground/80 px-1">Titik Jemput</h3>
+          <Select value={selectedPickup} onValueChange={setSelectedPickup}>
+            <SelectTrigger className="h-16 rounded-2xl border-border/50 bg-card font-bold transition-all focus:ring-primary/20">
+              <SelectValue placeholder="Pilih lokasi penjemputan" />
+            </SelectTrigger>
+            <SelectContent className="rounded-2xl border-none shadow-2xl">
+              {points.filter(p => p.distanceToDestination > 0).map(p => (
+                <SelectItem key={p.id} value={p.id} className="py-3 rounded-xl focus:bg-primary/5">
+                  <div className="flex flex-col">
+                    <span className="font-black text-sm">{p.name}</span>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter">
+                      {formatPrice(p.price)} • {(p.distanceToDestination / 1000).toFixed(0)} KM ke tujuan
+                    </span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </section>
+
+        {/* Seat Selection */}
+        <section className="space-y-3">
+          <div className="flex items-center justify-between px-1">
+            <h3 className="font-black text-sm uppercase tracking-widest text-muted-foreground/80">Pilih Kursi</h3>
+            <div className="flex gap-3">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-success" />
+                <span className="text-[10px] font-black uppercase opacity-60">Tersedia</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-primary" />
+                <span className="text-[10px] font-black uppercase opacity-60">Dipilih</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-muted/30 rounded-[32px] p-8 border border-border/40">
+            <div className="max-w-[180px] mx-auto space-y-8">
+              {/* Cockpit Area */}
+              <div className="flex justify-between items-center opacity-40">
+                <div className="w-10 h-10 rounded-xl bg-foreground/10 flex items-center justify-center">
+                  <div className="w-6 h-6 rounded-full border-2 border-current border-t-transparent" />
+                </div>
+                <div className="px-3 py-1 rounded-full border border-current text-[10px] font-black uppercase tracking-widest">Driver</div>
+              </div>
+
+              {/* Seats Grid */}
+              <div className={`grid gap-4 ${cols === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                {seats.map(seat => {
+                  const isBooked = bookedSeats.includes(seat.seatNumber);
+                  const isSelected = selectedSeat === seat.seatNumber;
+                  return (
+                    <button
+                      key={seat.seatNumber}
+                      disabled={isBooked}
+                      onClick={() => setSelectedSeat(isSelected ? null : seat.seatNumber)}
+                      className={cn(
+                        "relative aspect-square rounded-2xl flex items-center justify-center text-sm font-black transition-all duration-300",
+                        isBooked ? "bg-muted text-muted-foreground/30 cursor-not-allowed grayscale" :
+                        isSelected ? "bg-primary text-primary-foreground scale-110 shadow-xl shadow-primary/30 z-10" :
+                        "bg-success/10 text-success hover:bg-success/20 hover:scale-105"
+                      )}
+                    >
+                      {seat.seatNumber}
+                      {isSelected && <CheckCircle2 className="absolute -top-1 -right-1 h-4 w-4 fill-primary text-primary-foreground shadow-sm" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Promo Code */}
+        <section className="space-y-3">
+          <h3 className="font-black text-sm uppercase tracking-widest text-muted-foreground/80 px-1">Kode Promo</h3>
+          <div className={cn(
+            "p-4 rounded-[24px] border border-border/50 transition-all",
+            appliedPromo ? "bg-primary/5 border-primary/20 ring-1 ring-primary/20" : "bg-card"
+          )}>
+            {!appliedPromo ? (
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Ticket className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
+                  <Input 
+                    placeholder="KODE PROMO" 
+                    value={promoCode}
+                    onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                    className="pl-9 h-12 rounded-xl border-border/50 bg-background font-black tracking-widest uppercase placeholder:font-bold placeholder:tracking-normal focus-visible:ring-primary/20"
+                  />
+                </div>
+                <Button 
+                  onClick={handleApplyPromo} 
+                  disabled={!promoCode}
+                  className="h-12 rounded-xl px-6 font-black uppercase tracking-widest shadow-lg shadow-primary/20"
+                >
+                  Pakai
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="bg-primary/20 p-2 rounded-xl text-primary">
+                    <Percent className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="font-black text-sm text-primary tracking-widest">{appliedPromo.code}</p>
+                    <p className="text-[10px] font-bold text-primary/60 uppercase">{appliedPromo.description}</p>
+                  </div>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleRemovePromo}
+                  className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl font-black text-[10px] uppercase"
+                >
+                  Hapus
+                </Button>
+              </div>
+            )}
+            {promoError && (
+              <p className="mt-2 text-[10px] font-bold text-rose-500 flex items-center gap-1.5 px-1 uppercase tracking-tight">
+                <AlertCircle className="h-3.5 w-3.5" /> {promoError}
+              </p>
+            )}
+          </div>
+        </section>
+
+        {/* Payment Summary */}
+        <Card className="rounded-[32px] border-none bg-muted/30 overflow-hidden shadow-inner">
+          <CardContent className="p-6 space-y-4">
+            <h3 className="font-black text-sm uppercase tracking-widest text-muted-foreground/80">Rincian Pembayaran</h3>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center text-sm">
+                <span className="font-bold text-muted-foreground uppercase text-[10px] tracking-widest">Harga Tiket</span>
+                <span className="font-black text-foreground">{formatPrice(pricingDetails?.basePrice || basePrice)}</span>
+              </div>
+              {pricingDetails?.discountAmount > 0 && (
+                <div className="flex justify-between items-center text-sm">
+                  <span className="font-bold text-primary uppercase text-[10px] tracking-widest">Diskon</span>
+                  <span className="font-black text-primary">-{formatPrice(pricingDetails.discountAmount)}</span>
+                </div>
+              )}
+              {pricingDetails && pricingDetails.taxAmount > 0 && (
+                <div className="flex justify-between items-center text-sm">
+                  <span className="font-bold text-muted-foreground uppercase text-[10px] tracking-widest">Pajak (11%)</span>
+                  <span className="font-black text-foreground">{formatPrice(pricingDetails.taxAmount)}</span>
+                </div>
+              )}
+              <Separator className="bg-border/40" />
+              <div className="flex justify-between items-center">
+                <span className="font-black text-foreground uppercase text-xs tracking-widest">Total Bayar</span>
+                <span className="text-2xl font-black text-primary tracking-tighter">
+                  {formatPrice(pricingDetails?.finalPrice || basePrice)}
+                </span>
+              </div>
             </div>
           </CardContent>
+          <CardFooter className="p-6 pt-0">
+            <Button 
+              className="w-full h-16 rounded-2xl text-lg font-black uppercase tracking-widest shadow-xl shadow-primary/30 transition-all hover:shadow-2xl active:scale-95"
+              onClick={handleBooking}
+              disabled={!selectedSeat || !selectedPickup || isProcessing}
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Memproses...
+                </>
+              ) : (
+                'Bayar Sekarang'
+              )}
+            </Button>
+          </CardFooter>
         </Card>
       </div>
 
-      <PaymentModal
-        open={showPayment}
+      <PaymentModal 
+        open={showPayment} 
         onClose={() => setShowPayment(false)}
-        amount={currentPrice}
+        amount={pricingDetails?.finalPrice || basePrice}
         onConfirm={handlePaymentConfirm}
       />
     </div>
