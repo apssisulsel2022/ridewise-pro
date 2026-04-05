@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { MapPin, Plus, Pencil, Trash2, Save, X, Route as RouteIcon } from 'lucide-react';
 import { Route, RoutePoint } from '@/types/shuttle';
 import { toast } from 'sonner';
+import { OSM_ATTRIBUTION, OSM_TILE_URL } from '@/lib/map-tiles';
 
 // Enhanced marker styles with semantic icons
 const markerStyles = `

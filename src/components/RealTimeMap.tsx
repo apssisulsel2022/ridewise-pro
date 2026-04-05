@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { cn } from '@/lib/utils';
@@ -78,6 +78,8 @@ const RealTimeMap = ({
   const geofenceCirclesRef = useRef<Record<string, L.Circle>>({});
   const trafficLayerRef = useRef<L.TileLayer | null>(null);
   const updateIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastUpdateRef = useRef<number>(0);
+  const baseLayerRef = useRef<L.TileLayer | null>(null);
   const [mapReady, setMapReady] = useState(false);
 
   const [centerLat, centerLng] = center;
@@ -171,7 +173,7 @@ const RealTimeMap = ({
         connectingLinesRef.current[connectLineId] = connectLine;
       }
     }
-  }, [routes, routePoints, driverLocations, createRouteLine, createRoutePointIcon, createRoutePointPopup]);
+  }, [routes, routePoints, driverLocations]);
 
   // Create geofence zones around pickup points
   const createGeofences = useCallback(() => {
@@ -211,13 +213,39 @@ const RealTimeMap = ({
     });
   }, [showGeofences, activeSchedules, routes, routePoints]);
 
+  // Inject map styles once (idempotent)
+  useMemo(() => {
+    if (typeof document !== 'undefined' && !document.getElementById('map-styles-injected')) {
+      const style = document.createElement('style');
+      style.id = 'map-styles-injected';
+      style.innerHTML = getMapStyles();
+      document.head.appendChild(style);
+    }
+  }, []);
+
+  // Auto-fit map bounds to show all drivers
+  const fitMapToBounds = useCallback(() => {
+    if (!mapInstance.current || Object.keys(markersRef.current).length === 0) return;
+    
+    const bounds = L.latLngBounds(
+      Object.values(markersRef.current).map(m => m.getLatLng())
+    );
+    
+    try {
+      mapInstance.current.fitBounds(bounds, { padding: [50, 50], animate: true, duration: 0.5 });
+    } catch (e) {
+      // Bounds may be invalid if all markers are at the same point
+      console.debug('Could not fit bounds', e);
+    }
+  }, []);
+
   // Initialize map with base layer once on mount
   useEffect(() => {
     if (!mapRef.current || mapInstance.current) return;
 
-    // Fix for Leaflet icons in Vite
-    const iconPrototype = (L.Icon.Default.prototype as any);
-    delete iconPrototype._getIconUrl;
+    // Fix for Leaflet icons in Vite (bypass icon URL override)
+    const iconPrototypeObj = L.Icon.Default.prototype as unknown as Record<string, unknown>;
+    delete iconPrototypeObj._getIconUrl;
 
     L.Icon.Default.mergeOptions({
       iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
@@ -228,19 +256,32 @@ const RealTimeMap = ({
     const map = L.map(mapRef.current, {
       zoomControl: true,
       attributionControl: true,
+      // Performance optimizations
+      preferCanvas: true, // Better performance for large number of markers
+      inertia: true,
+      inertiaDeceleration: 3400,
     }).setView([centerLat, centerLng], zoom);
 
-    // OpenStreetMap base layer
-    L.tileLayer(OSM_TILE_URL, {
+    // OpenStreetMap base layer with caching options
+    const tileLayer = L.tileLayer(OSM_TILE_URL, {
       attribution: OSM_ATTRIBUTION,
-      maxZoom: 19
+      maxZoom: 19,
+      minZoom: 2,
+      crossOrigin: true,
+      // Performance: limit concurrent tile loads
+      tileSize: 256,
+      updateWhenIdle: false,
+      keepBuffer: 2,
     }).addTo(map);
+    
+    baseLayerRef.current = tileLayer;
 
-    // Add custom CSS styles for animations
-    const style = document.createElement('style');
-    style.innerHTML = getMapStyles();
-    document.head.appendChild(style);
-
+    // Add keyboard shortcuts for accessibility
+    map.keyboard.enable();
+    
+    // Custom map controls
+    L.control.zoom({ position: 'topright' }).addTo(map);
+    
     mapInstance.current = map;
     setMapReady(true);
 
@@ -254,6 +295,7 @@ const RealTimeMap = ({
       }
       map.remove();
       mapInstance.current = null;
+      baseLayerRef.current = null;
       setMapReady(false);
     };
   }, []);
@@ -261,7 +303,7 @@ const RealTimeMap = ({
   // Update map view only when coordinates or zoom change
   useEffect(() => {
     if (!mapInstance.current) return;
-    mapInstance.current.setView([centerLat, centerLng], zoom);
+    mapInstance.current.setView([centerLat, centerLng], zoom, { animate: true, duration: 0.5 });
   }, [centerLat, centerLng, zoom]);
 
   // Setup route tracking for selected schedule
@@ -288,11 +330,21 @@ const RealTimeMap = ({
     }
   }, [routeTracking, onRouteInfoChange, showRouteTracking]);
 
-  // Real-time driver marker updates
+  // Real-time driver marker updates with optimizations
   useEffect(() => {
     if (!mapInstance.current || activeSchedules.length === 0) return;
 
     const updateMap = () => {
+      const now = Date.now();
+      
+      // Skip update if called too frequently (debounce)
+      if (now - lastUpdateRef.current < 100) {
+        return;
+      }
+      lastUpdateRef.current = now;
+
+      let hasNewMarkers = false;
+
       // Update driver markers
       activeSchedules.forEach(schedule => {
         const driverId = schedule.driverId;
@@ -308,24 +360,50 @@ const RealTimeMap = ({
         const driverStatus = getDriverStatus(driver, location, schedule);
 
         if (markersRef.current[driverId]) {
-          // Update existing marker
-          markersRef.current[driverId].setLatLng(pos);
+          // Update existing marker with smooth animation
+          const existingMarker = markersRef.current[driverId];
+          const currentLatLng = existingMarker.getLatLng();
+          
+          // Only update if position changed significantly (avoid jitter)
+          const distance = currentLatLng.distanceTo(L.latLng(pos[0], pos[1]));
+          if (distance > 5) { // Only update if moved more than 5 meters
+            existingMarker.setLatLng(pos);
+          }
+          
           const newIcon = createDriverIcon(driverStatus, isSelected, true);
-          markersRef.current[driverId].setIcon(newIcon);
+          existingMarker.setIcon(newIcon);
         } else {
           // Create new driver marker
+          hasNewMarkers = true;
           const icon = createDriverIcon(driverStatus, isSelected, true);
-          const marker = L.marker(pos, { icon }).addTo(mapInstance.current!);
+          const marker = L.marker(pos, { 
+            icon,
+            title: `${driver.name} - ${driverStatus}`, // Accessibility
+          }).addTo(mapInstance.current!);
 
-          // Bind detailed popup
+          // Bind detailed popup with memoized content
           const popupHTML = createDriverPopup(driver, schedule, location);
-          marker.bindPopup(L.popup({ className: 'driver-marker-popup', maxWidth: 300 }).setContent(popupHTML));
+          const popup = L.popup({ 
+            className: 'driver-marker-popup', 
+            maxWidth: 300,
+            closeButton: true,
+            autoClose: true,
+          }).setContent(popupHTML);
+          
+          marker.bindPopup(popup);
 
           marker.on('click', () => {
             if (onDriverClick) {
               onDriverClick(driverId);
             }
           });
+
+          // Improve accessibility with keyboard navigation
+          const markerEl = marker.getElement() as HTMLElement | undefined;
+          if (markerEl) {
+            markerEl.setAttribute('tabindex', '0');
+            markerEl.setAttribute('role', 'button');
+          }
 
           markersRef.current[driverId] = marker;
         }
@@ -348,7 +426,8 @@ const RealTimeMap = ({
                 weight: 2,
                 opacity: 0.5,
                 dashArray: '2, 4',
-                lineCap: 'round'
+                lineCap: 'round',
+                className: 'driver-history-trail',
               }).addTo(mapInstance.current!);
               
               historyLinesRef.current[driverId] = polyline;
@@ -395,13 +474,28 @@ const RealTimeMap = ({
           delete connectingLinesRef.current[lineId];
         }
       });
+
+      // Clean up removed history trails
+      Object.keys(historyLinesRef.current).forEach(driverId => {
+        if (!activeSchedules.find(s => s.driverId === driverId)) {
+          if (mapInstance.current && historyLinesRef.current[driverId]) {
+            mapInstance.current.removeLayer(historyLinesRef.current[driverId]);
+          }
+          delete historyLinesRef.current[driverId];
+        }
+      });
+
+      // Auto-fit bounds when new markers are added
+      if (hasNewMarkers && Object.keys(markersRef.current).length > 0) {
+        setTimeout(() => fitMapToBounds(), 100);
+      }
     };
 
     // Initial update
     updateMap();
 
-    // Set up real-time updates
-    updateIntervalRef.current = setInterval(updateMap, updateInterval);
+    // Set up real-time updates with reduced frequency for better performance
+    updateIntervalRef.current = setInterval(updateMap, Math.max(updateInterval, 500));
 
     return () => {
       if (updateIntervalRef.current) {
@@ -420,8 +514,7 @@ const RealTimeMap = ({
     updateInterval,
     getDriverStatus,
     selectedDriverId,
-    createDriverIcon,
-    createDriverPopup,
+    fitMapToBounds,
   ]);
 
   // Toggle traffic layer

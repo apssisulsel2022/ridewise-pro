@@ -212,7 +212,7 @@ const AdminRoutes = () => {
       r.id, r.name, r.rayon, r.origin, r.destination, r.distanceKm.toFixed(2), r.price
     ]);
     
-    let csvContent = "data:text/csv;charset=utf-8," 
+    const csvContent = "data:text/csv;charset=utf-8," 
       + headers.join(",") + "\n"
       + rows.map(e => e.join(",")).join("\n");
 
@@ -438,7 +438,7 @@ const AdminRoutes = () => {
       log.id, log.rayon, log.oldPrice, log.newPrice, log.changedBy, format(new Date(log.changeDate), 'yyyy-MM-dd HH:mm'), log.reason
     ]);
     
-    let csvContent = "data:text/csv;charset=utf-8," 
+    const csvContent = "data:text/csv;charset=utf-8," 
       + headers.join(",") + "\n"
       + rows.map(e => e.join(",")).join("\n");
 

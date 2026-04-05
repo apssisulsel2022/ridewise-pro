@@ -97,6 +97,79 @@ export const ShuttleProvider = ({ children }: { children: ReactNode }) => {
   const [driverLocations, setDriverLocations] = useState<Record<string, DriverLocation>>({});
   const [trackingLogs, setTrackingLogs] = useState<TrackingLog[]>([]);
 
+  // Simulate GPS data for active drivers
+  useEffect(() => {
+    const activeSchedules = schedules.filter(s => s.driverId && (s.status === 'departed' || s.status === 'boarding' || s.status === 'in-transit'));
+    const activeDriverIds = activeSchedules.map(s => s.driverId).filter(Boolean) as string[];
+
+    // Generate mock GPS data for active drivers
+    const mockLocations: Record<string, DriverLocation> = {};
+
+    activeDriverIds.forEach(driverId => {
+      const schedule = activeSchedules.find(s => s.driverId === driverId);
+      if (!schedule) return;
+
+      // Get route points for this schedule
+      const route = routes.find(r => r.id === schedule.routeId);
+      if (!route) return;
+
+      const points = routePoints
+        .filter(p => p.routeId === route.id)
+        .sort((a, b) => a.order - b.order);
+
+      if (points.length === 0) return;
+
+      // Simulate driver position along the route
+      const progress = Math.random(); // 0-1 progress along route
+      const pointIndex = Math.floor(progress * (points.length - 1));
+      const nextPointIndex = Math.min(pointIndex + 1, points.length - 1);
+
+      const currentPoint = points[pointIndex];
+      const nextPoint = points[nextPointIndex];
+
+      // Interpolate position between points
+      const lat = currentPoint.lat + (nextPoint.lat - currentPoint.lat) * (progress * (points.length - 1) - pointIndex);
+      const lng = currentPoint.lng + (nextPoint.lng - currentPoint.lng) * (progress * (points.length - 1) - pointIndex);
+
+      mockLocations[driverId] = {
+        driverId,
+        latitude: lat,
+        longitude: lng,
+        lat, // duplicate for compatibility
+        lng, // duplicate for compatibility
+        speed: Math.random() * 60 + 20, // 20-80 km/h
+        heading: Math.random() * 360,
+        accuracy: 5,
+        timestamp: new Date().toISOString(),
+        status: 'moving'
+      };
+    });
+
+    setDriverLocations(mockLocations);
+
+    // Update GPS data every 5 seconds
+    const interval = setInterval(() => {
+      setDriverLocations(prev => {
+        const updated = { ...prev };
+        Object.keys(updated).forEach(driverId => {
+          // Add small random movement
+          updated[driverId] = {
+            ...updated[driverId],
+            latitude: updated[driverId].latitude + (Math.random() - 0.5) * 0.001,
+            longitude: updated[driverId].longitude + (Math.random() - 0.5) * 0.001,
+            lat: updated[driverId].lat + (Math.random() - 0.5) * 0.001,
+            lng: updated[driverId].lng + (Math.random() - 0.5) * 0.001,
+            speed: Math.random() * 60 + 20,
+            timestamp: new Date().toISOString()
+          };
+        });
+        return updated;
+      });
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [schedules, routes, routePoints]);
+
   const updateDriverLocation = useCallback((driverId: string, location: DriverLocation) => {
     setDriverLocations(prev => ({
       ...prev,

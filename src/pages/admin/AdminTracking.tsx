@@ -1,69 +1,25 @@
-import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import { useShuttle } from '@/contexts/ShuttleContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, Navigation, Clock, Activity, AlertCircle, Filter, MapPin, Wifi, WifiOff, Eye, EyeOff } from 'lucide-react';
+import { Search, MapPin, Eye, EyeOff, Activity, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
-import RealTimeMap from '@/components/RealTimeMap';
+import StaticMap from '@/components/StaticMap';
+import GPSMap from '@/components/GPSMap';
 import MapLegend from '@/components/MapLegend';
-import { useRealTimeTracking } from '@/hooks/useRealTimeTracking';
-import { RouteInfoPanel, ETADisplay, RouteTrackingHookResult } from '@/components/RouteTrackingDisplay';
-import { DriverLocation } from '@/types/shuttle';
 import { toast } from 'sonner';
 
 const AdminTracking = () => {
-  const { schedules, routes, drivers, routePoints } = useShuttle();
+  const { schedules, routes, drivers, routePoints, driverLocations } = useShuttle();
   const [selectedDriver, setSelectedDriver] = useState<string | null>(null);
-  const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showHistory, setShowHistory] = useState(false);
-  const [showGeofences, setShowGeofences] = useState(true);
-  const [showTraffic, setShowTraffic] = useState(false);
-  const [routeTracking, setRouteTracking] = useState<RouteTrackingHookResult | null>(null);
+  const [showLegend, setShowLegend] = useState(true);
+  const [enableGPS, setEnableGPS] = useState(false);
 
-  // Memoize callbacks to prevent infinite re-initialization
-  const handleLocationUpdate = useCallback((location: DriverLocation) => {
-    // Optional: Handle individual location updates
-    console.log('Location update:', location);
-  }, []);
-
-  const handleScheduleUpdate = useCallback(() => {
-    // Handle schedule updates if needed
-  }, []);
-
-  const handleDriverStatusChange = useCallback(() => {
-    // Handle driver status changes if needed
-  }, []);
-
-  // Use real-time tracking hook
-  const {
-    driverLocations: rtDriverLocations,
-    trackingLogs: rtTrackingLogs,
-    activeSchedules: rtActiveSchedules,
-    isConnected,
-    connectionType,
-    sendLocationUpdate,
-    sendDriverStatusChange
-  } = useRealTimeTracking({
-    config: {
-      updateInterval: 2000, // Faster updates for admin view
-      enableWebSocket: false, // Use polling for now
-      enableGeofencing: true,
-      enableHistoryTracking: true,
-      maxHistoryPoints: 200
-    },
-    onLocationUpdate: handleLocationUpdate,
-    onScheduleUpdate: handleScheduleUpdate,
-    onDriverStatusChange: handleDriverStatusChange
-  });
-
-  // Combine context data with real-time data
-  const driverLocations = { ...rtDriverLocations };
-  const trackingLogs = rtTrackingLogs;
-  const activeSchedules = rtActiveSchedules.length > 0 ? rtActiveSchedules : useMemo(() =>
+  // Get active schedules from context
+  const activeSchedules = useMemo(() =>
     schedules.filter(s => s.driverId && (s.status === 'departed' || s.status === 'boarding')),
     [schedules]
   );
@@ -80,83 +36,65 @@ const AdminTracking = () => {
   }, [activeSchedules, drivers, routes, searchQuery]);
 
   const centerOnDriver = (driverId: string) => {
-    const loc = driverLocations[driverId];
-    if (loc) {
-      // The RealTimeMap component will handle centering
-      setSelectedDriver(driverId);
-      
-      // Also select the schedule for this driver to show route tracking
-      const schedule = activeSchedules.find(s => s.driverId === driverId);
-      if (schedule) {
-        setSelectedScheduleId(schedule.id);
-      }
-      
-      toast.info(`Focusing on ${drivers.find(d => d.id === driverId)?.name}`);
+    setSelectedDriver(driverId);
+    const driver = drivers.find(d => d.id === driverId);
+    if (driver) {
+      toast.info(`Focusing on ${driver.name}`);
     }
   };
 
   const handleDriverClick = (driverId: string) => {
     setSelectedDriver(driverId);
-    
-    // Also select the schedule for this driver to show route tracking
-    const schedule = activeSchedules.find(s => s.driverId === driverId);
-    if (schedule) {
-      setSelectedScheduleId(schedule.id);
-    }
-    
     const driver = drivers.find(d => d.id === driverId);
-    toast.info(`Selected driver: ${driver?.name}`);
+    if (driver) {
+      toast.info(`Selected driver: ${driver.name}`);
+    }
   };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-700">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-black tracking-tighter text-foreground">Fleet Tracking</h2>
-          <p className="text-muted-foreground font-medium text-sm">Monitor armada dan lokasi driver secara real-time.</p>
+          <h2 className="text-3xl font-black tracking-tighter text-foreground">Fleet Map</h2>
+          <p className="text-muted-foreground font-medium text-sm">
+            {enableGPS
+              ? 'Pantau lokasi armada secara real-time dengan GPS.'
+              : 'Lihat lokasi armada dan rute secara statis.'
+            }
+          </p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Connection Status */}
           <Badge variant="outline" className={cn(
             "rounded-full px-3 py-1 font-black uppercase tracking-widest text-[10px]",
-            isConnected ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "bg-red-500/10 text-red-600 border-red-200"
+            enableGPS
+              ? "bg-green-500/10 text-green-600 border-green-200"
+              : "bg-blue-500/10 text-blue-600 border-blue-200"
           )}>
-            {isConnected ? <Wifi className="h-3 w-3 mr-1" /> : <WifiOff className="h-3 w-3 mr-1" />}
-            {connectionType.toUpperCase()}
+            {enableGPS ? '🛰️ GPS ACTIVE' : '✓ STATIC MAP'}
           </Badge>
 
           <Button
-            variant={showGeofences ? "default" : "outline"}
+            variant={enableGPS ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setShowGeofences(!showGeofences)}
+            onClick={() => setEnableGPS(!enableGPS)}
             className="rounded-xl font-black uppercase tracking-widest text-[10px]"
           >
-            <MapPin className="h-3.5 w-3.5 mr-2" />
-            Geofence
+            <Activity className="h-3.5 w-3.5 mr-2" />
+            {enableGPS ? 'Disable GPS' : 'Enable GPS'}
           </Button>
 
           <Button
-            variant={showTraffic ? "default" : "outline"}
+            variant={showLegend ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setShowTraffic(!showTraffic)}
+            onClick={() => setShowLegend(!showLegend)}
             className="rounded-xl font-black uppercase tracking-widest text-[10px]"
           >
-            <Navigation className="h-3.5 w-3.5 mr-2" />
-            Traffic
+            {showLegend ? <Eye className="h-3.5 w-3.5 mr-2" /> : <EyeOff className="h-3.5 w-3.5 mr-2" />}
+            Legend
           </Button>
 
-          <Button
-            variant={showHistory ? "default" : "outline"}
-            size="sm"
-            onClick={() => setShowHistory(!showHistory)}
-            className="rounded-xl font-black uppercase tracking-widest text-[10px]"
-          >
-            <Clock className="h-3.5 w-3.5 mr-2" />
-            History
-          </Button>
-
-          <Badge variant="outline" className="rounded-full bg-emerald-500/10 text-emerald-600 border-emerald-200 px-3 py-1 font-black uppercase tracking-widest text-[10px] animate-pulse">
-            📡 LIVE: {activeSchedules.length}
+          <Badge variant="outline" className="rounded-full bg-blue-500/10 text-blue-600 border-blue-200 px-3 py-1 font-black uppercase tracking-widest text-[10px]">
+            📍 {activeSchedules.length}
           </Badge>
         </div>
       </div>
@@ -164,27 +102,32 @@ const AdminTracking = () => {
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
         <Card className="xl:col-span-3 border-none shadow-2xl shadow-slate-200/50 rounded-[2.5rem] overflow-hidden bg-white">
           <CardContent className="p-0 relative h-[650px]">
-            <RealTimeMap
-              center={[3.5952, 98.6722]}
-              zoom={13}
-              className="w-full h-full"
-              showTraffic={showTraffic}
-              showGeofences={showGeofences}
-              driverLocations={driverLocations}
-              activeSchedules={activeSchedules}
-              drivers={drivers}
-              routes={routes}
-              routePoints={routePoints}
-              trackingLogs={trackingLogs}
-              onDriverClick={handleDriverClick}
-              enableClustering={true}
-              showHistory={showHistory}
-              updateInterval={2000}
-              selectedDriverId={selectedDriver}
-              showRouteTracking={true}
-              selectedScheduleId={selectedScheduleId}
-              onRouteInfoChange={setRouteTracking}
-            />
+            {enableGPS ? (
+              <GPSMap
+                center={[3.5952, 98.6722]}
+                zoom={13}
+                className="w-full h-full"
+                drivers={drivers}
+                routes={routes}
+                routePoints={routePoints}
+                activeSchedules={activeSchedules}
+                driverLocations={driverLocations}
+                onDriverClick={handleDriverClick}
+                enableGPS={true}
+                updateInterval={5000}
+              />
+            ) : (
+              <StaticMap
+                center={[3.5952, 98.6722]}
+                zoom={13}
+                className="w-full h-full"
+                drivers={drivers}
+                routes={routes}
+                routePoints={routePoints}
+                activeSchedules={activeSchedules}
+                onDriverClick={handleDriverClick}
+              />
+            )}
 
             {/* Search Overlay */}
             <div className="absolute top-6 left-6 z-[400] w-72">
@@ -199,18 +142,8 @@ const AdminTracking = () => {
               </div>
             </div>
 
-            {/* Connection Status Overlay */}
-            {!isConnected && (
-              <div className="absolute top-6 right-6 z-[400]">
-                <Badge variant="destructive" className="rounded-full px-3 py-1 font-black text-xs animate-pulse">
-                  <WifiOff className="h-3 w-3 mr-2" />
-                  DISCONNECTED
-                </Badge>
-              </div>
-            )}
-
             {/* Map Legend */}
-            <MapLegend variant="compact" position="bottom-right" />
+            {showLegend && <MapLegend variant="compact" position="bottom-right" />}
           </CardContent>
         </Card>
 
@@ -232,7 +165,6 @@ const AdminTracking = () => {
                 filteredSchedules.map(s => {
                   const driver = drivers.find(d => d.id === s.driverId);
                   const route = routes.find(r => r.id === s.routeId);
-                  const location = driverLocations[s.driverId!];
                   const isSelected = selectedDriver === s.driverId;
 
                   return (
@@ -269,29 +201,6 @@ const AdminTracking = () => {
                             {s.status}
                           </Badge>
                         </div>
-
-                        {location && (
-                          <div className="grid grid-cols-2 gap-3 pt-3 border-t border-border/40">
-                            <div className="flex items-center gap-2">
-                              <div className="p-1.5 rounded-lg bg-slate-100 text-slate-500">
-                                <Activity className="h-3 w-3" />
-                              </div>
-                              <div>
-                                <p className="text-[9px] font-black text-muted-foreground uppercase leading-none">Speed</p>
-                                <p className="text-xs font-black">{location.speed?.toFixed(1) || '0'} <span className="text-[9px] opacity-60">km/h</span></p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="p-1.5 rounded-lg bg-slate-100 text-slate-500">
-                                <Clock className="h-3 w-3" />
-                              </div>
-                              <div>
-                                <p className="text-[9px] font-black text-muted-foreground uppercase leading-none">Updated</p>
-                                <p className="text-xs font-black">{format(new Date(location.timestamp), 'HH:mm:ss')}</p>
-                              </div>
-                            </div>
-                          </div>
-                        )}
                       </CardContent>
                     </Card>
                   );

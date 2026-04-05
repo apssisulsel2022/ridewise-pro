@@ -254,11 +254,11 @@ export const createDriverPopup = (
           </span>
           
           <span style="color: #6b7280;">📊 Rating:</span>
-          <span>⭐ ${driver.rating.toFixed(1)} (${driver.totalTrips} trips)</span>
+          <span>⭐ ${driver.rating?.toFixed(1) || '0.0'} (${driver.totalTrips || 0} trips)</span>
           
           ${schedule ? `
             <span style="color: #6b7280;">✈️ Trip:</span>
-            <span>${schedule.id.substring(0, 8)}...</span>
+            <span>${schedule.id?.substring(0, 8) || 'N/A'}...</span>
           ` : ''}
           
           ${location ? `
